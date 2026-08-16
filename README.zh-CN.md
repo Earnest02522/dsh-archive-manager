@@ -1,6 +1,8 @@
 # dsh-archive-manager（归档会话管理插件）
 
-为 [DeepSeek Harness](https://github.com/deepseek-ai/dsh) 提供**归档会话管理**的插件：
+[English](README.md) | [简体中文](README.zh-CN.md)
+
+为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 提供**归档会话管理**的插件：
 在侧边栏底部新增入口，弹出面板**按工作区归类**列出所有已归档的会话，支持
 **查看（打开）**、**恢复（取消归档）**，以及**打开对话文件夹**（在文件管理器里定位该会话的原始日志目录）。
 

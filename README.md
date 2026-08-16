@@ -1,6 +1,8 @@
 # dsh-archive-manager
 
-A plugin for [DeepSeek Harness](https://github.com/deepseek-ai/dsh) that adds
+[English](README.md) | [简体中文](README.zh-CN.md)
+
+A plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) that adds
 **archived-conversation management**: a sidebar entry that lists your archived
 conversations — **grouped by workspace** — and lets you **view** (open),
 **restore** (unarchive), or **reveal the transcript folder** of any archived
