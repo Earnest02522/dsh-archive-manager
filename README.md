@@ -88,7 +88,10 @@ loader (`dsh.client.platform = "web"`).
 
 ### One-command install (Windows)
 
+Open PowerShell and `cd` into the repo folder first, then run the script:
+
 ```powershell
+cd <path-to-repo>          # e.g. cd D:\dsh-archive-manager
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 ```
 

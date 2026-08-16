@@ -58,7 +58,10 @@
 
 ### 一键安装命令（Windows）
 
+打开 PowerShell，**先 `cd` 进入仓库目录**，再运行脚本：
+
 ```powershell
+cd <仓库路径>              # 例如 cd D:\dsh-archive-manager
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 ```
 
