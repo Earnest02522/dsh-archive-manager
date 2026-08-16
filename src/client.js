@@ -250,12 +250,6 @@ window.__ModuleLoader__.load({
 			resizeNE: { position: "absolute", top: 0, right: 0, width: 14, height: 14, cursor: "nesw-resize", zIndex: 4 },
 			resizeSW: { position: "absolute", bottom: 0, left: 0, width: 14, height: 14, cursor: "nesw-resize", zIndex: 4 },
 			resizeSE: { position: "absolute", bottom: 0, right: 0, width: 16, height: 16, cursor: "nwse-resize", zIndex: 4 },
-			headGrip: {
-				flex: "none", width: 12, height: 16, cursor: "grab",
-				backgroundImage: "radial-gradient(circle, var(--dsw-alias-state-business-primary, #3b6ef6) 1.7px, transparent 2px)",
-				backgroundSize: "5px 5px", backgroundPosition: "left center",
-				opacity: 0.9
-			},
 			headIcon: {
 				display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24,
 				borderRadius: 7, color: "var(--dsw-alias-state-business-primary, #3b6ef6)",
@@ -629,8 +623,7 @@ window.__ModuleLoader__.load({
 				{ ref: panelRef, style: panelStyle, role: "dialog", "aria-label": STR.title },
 				React.createElement(
 					"div",
-					{ style: S.head, onPointerDown: (e) => startDrag(e, "move") },
-					React.createElement("span", { style: S.headGrip }),
+					{ style: S.head, className: "dsh-am-head", onPointerDown: (e) => startDrag(e, "move") },
 					React.createElement("span", { style: S.headIcon }, I.archive),
 					React.createElement("span", { style: S.headTitle }, STR.title),
 					React.createElement("span", { style: S.badge }, STR.count(total)),
@@ -671,7 +664,12 @@ window.__ModuleLoader__.load({
 			if (typeof document !== "undefined" && !document.querySelector("style[data-am-rz]")) {
 				const tag = document.createElement("style");
 				tag.dataset.amRz = "1";
-				tag.textContent = ".dsh-am-rz{background:transparent}.dsh-am-rz:hover{background:color-mix(in srgb, var(--dsw-alias-state-business-primary, #3b6ef6) 30%, transparent)}";
+				tag.textContent = [
+					".dsh-am-rz{background:transparent}",
+					".dsh-am-rz:hover{background:rgba(59,110,246,.28);box-shadow:inset 0 0 0 1.5px rgba(59,110,246,.9)}",
+					".dsh-am-head{cursor:grab}",
+					".dsh-am-head:hover{background:rgba(59,110,246,.10)}"
+				].join(" ");
 				document.head.appendChild(tag);
 			}
 
