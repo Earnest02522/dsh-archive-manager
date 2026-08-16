@@ -240,7 +240,13 @@ window.__ModuleLoader__.load({
 			},
 			head: {
 				display: "flex", alignItems: "center", gap: 8, padding: "12px 14px 10px",
-				borderBottom: "1px solid var(--dsw-alias-border-l1, #f0f1f3)"
+				borderBottom: "1px solid var(--dsw-alias-border-l1, #f0f1f3)", cursor: "grab"
+			},
+			resizeHandle: {
+				position: "absolute", right: 2, bottom: 2, width: 12, height: 12,
+				cursor: "nwse-resize", zIndex: 2, opacity: .72,
+				backgroundImage: "radial-gradient(circle, var(--dsw-alias-label-tertiary, #a3aab5) 1.6px, transparent 1.9px)",
+				backgroundSize: "6px 6px", backgroundPosition: "right bottom"
 			},
 			headIcon: {
 				display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24,
@@ -337,6 +343,44 @@ window.__ModuleLoader__.load({
 			const [hover, setHover] = useState(false);
 			const removedRef = useRef(removed);
 			removedRef.current = removed;
+
+			// Draggable / resizable panel.
+			const [dims, setDims] = useState(null); // {left, top, width, height} once moved/resized
+			const dragRef = useRef(null);           // {mode, startX, startY, base}
+			const panelRef = useRef(null);
+			const startDrag = useCallback((e, mode) => {
+				if (mode === "move" && e.target && e.target.closest && e.target.closest("button")) return;
+				const el = panelRef.current;
+				if (!el || dragRef.current) return;
+				const rect = el.getBoundingClientRect();
+				const base = dims || { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+				dragRef.current = { mode, startX: e.clientX, startY: e.clientY, base };
+				if (e.preventDefault) e.preventDefault();
+				const onMove = (ev) => {
+					const d = dragRef.current;
+					if (!d) return;
+					const dx = ev.clientX - d.startX;
+					const dy = ev.clientY - d.startY;
+					const vw = window.innerWidth || 1280;
+					const vh = window.innerHeight || 800;
+					if (d.mode === "move") {
+						const left = Math.min(Math.max(8, d.base.left + dx), Math.max(8, vw - Math.min(d.base.width, vw - 16) - 8));
+						const top = Math.min(Math.max(8, d.base.top + dy), Math.max(8, vh - 48));
+						setDims({ ...d.base, left, top });
+					} else {
+						const width = Math.min(Math.max(280, d.base.width + dx), vw - 16);
+						const height = Math.min(Math.max(220, d.base.height + dy), vh - 16);
+						setDims({ ...d.base, width, height });
+					}
+				};
+				const onUp = () => {
+					dragRef.current = null;
+					window.removeEventListener("pointermove", onMove);
+					window.removeEventListener("pointerup", onUp);
+				};
+				window.addEventListener("pointermove", onMove);
+				window.addEventListener("pointerup", onUp);
+			}, [dims]);
 
 			const archivedIds = (workspaces && workspaces.archivedSessionIds) || [];
 			const wsItems = (workspaces && workspaces.items) || [];
@@ -546,12 +590,18 @@ window.__ModuleLoader__.load({
 							)
 						);
 
+			const panelStyle = dims
+				? Object.assign({}, S.panel, {
+						left: dims.left, top: dims.top, right: "auto", bottom: "auto",
+						width: dims.width, height: dims.height, maxHeight: "none"
+					})
+				: S.panel;
 			const panelNode = React.createElement(
 				"div",
-				{ style: S.panel, role: "dialog", "aria-label": STR.title },
+				{ ref: panelRef, style: panelStyle, role: "dialog", "aria-label": STR.title },
 				React.createElement(
 					"div",
-					{ style: S.head },
+					{ style: S.head, onPointerDown: (e) => startDrag(e, "move") },
 					React.createElement("span", { style: S.headIcon }, I.archive),
 					React.createElement("span", { style: S.headTitle }, STR.title),
 					React.createElement("span", { style: S.badge }, STR.count(total)),
@@ -569,7 +619,13 @@ window.__ModuleLoader__.load({
 							React.createElement("span", null, toast.text)
 						)
 					: null,
-				bodyNode
+				bodyNode,
+				React.createElement("div", {
+					style: S.resizeHandle,
+					onPointerDown: (e) => startDrag(e, "resize"),
+					title: "调整大小 / Resize",
+					"aria-label": "调整大小 / Resize"
+				})
 			);
 
 			// A small pop animation via a keyframe injected once.
