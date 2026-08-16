@@ -242,11 +242,19 @@ window.__ModuleLoader__.load({
 				display: "flex", alignItems: "center", gap: 8, padding: "12px 14px 10px",
 				borderBottom: "1px solid var(--dsw-alias-border-l1, #f0f1f3)", cursor: "grab"
 			},
-			resizeHandle: {
-				position: "absolute", right: 2, bottom: 2, width: 12, height: 12,
-				cursor: "nwse-resize", zIndex: 2, opacity: .72,
-				backgroundImage: "radial-gradient(circle, var(--dsw-alias-label-tertiary, #a3aab5) 1.6px, transparent 1.9px)",
-				backgroundSize: "6px 6px", backgroundPosition: "right bottom"
+			resizeN: { position: "absolute", left: 10, top: 0, right: 10, height: 6, cursor: "ns-resize", zIndex: 3 },
+			resizeS: { position: "absolute", left: 10, bottom: 0, right: 10, height: 6, cursor: "ns-resize", zIndex: 3 },
+			resizeE: { position: "absolute", top: 10, right: 0, bottom: 10, width: 6, cursor: "ew-resize", zIndex: 3 },
+			resizeW: { position: "absolute", top: 10, left: 0, bottom: 10, width: 6, cursor: "ew-resize", zIndex: 3 },
+			resizeNW: { position: "absolute", top: 0, left: 0, width: 14, height: 14, cursor: "nwse-resize", zIndex: 4 },
+			resizeNE: { position: "absolute", top: 0, right: 0, width: 14, height: 14, cursor: "nesw-resize", zIndex: 4 },
+			resizeSW: { position: "absolute", bottom: 0, left: 0, width: 14, height: 14, cursor: "nesw-resize", zIndex: 4 },
+			resizeSE: { position: "absolute", bottom: 0, right: 0, width: 16, height: 16, cursor: "nwse-resize", zIndex: 4 },
+			headGrip: {
+				flex: "none", width: 12, height: 16, cursor: "grab",
+				backgroundImage: "radial-gradient(circle, var(--dsw-alias-state-business-primary, #3b6ef6) 1.7px, transparent 2px)",
+				backgroundSize: "5px 5px", backgroundPosition: "left center",
+				opacity: 0.9
 			},
 			headIcon: {
 				display: "flex", alignItems: "center", justifyContent: "center", width: 24, height: 24,
@@ -344,10 +352,11 @@ window.__ModuleLoader__.load({
 			const removedRef = useRef(removed);
 			removedRef.current = removed;
 
-			// Draggable / resizable panel.
+			// Draggable / resizable panel (8-way: n/s/e/w edges + 4 corners).
 			const [dims, setDims] = useState(null); // {left, top, width, height} once moved/resized
 			const dragRef = useRef(null);           // {mode, startX, startY, base}
 			const panelRef = useRef(null);
+			const MIN_W = 280, MIN_H = 220;
 			const startDrag = useCallback((e, mode) => {
 				if (mode === "move" && e.target && e.target.closest && e.target.closest("button")) return;
 				const el = panelRef.current;
@@ -367,9 +376,28 @@ window.__ModuleLoader__.load({
 						const left = Math.min(Math.max(8, d.base.left + dx), Math.max(8, vw - Math.min(d.base.width, vw - 16) - 8));
 						const top = Math.min(Math.max(8, d.base.top + dy), Math.max(8, vh - 48));
 						setDims({ ...d.base, left, top });
+					} else if (d.mode.startsWith("resize-")) {
+						// dir is one of: nw | n | ne | e | se | s | sw | w
+						const dir = d.mode.slice(7);
+						let { left, top, width, height } = d.base;
+						const right = left + width;
+						const bottom = top + height;
+						if (dir.includes("e")) width = Math.min(Math.max(MIN_W, width + dx), vw - 16);
+						if (dir.includes("s")) height = Math.min(Math.max(MIN_H, height + dy), vh - 16);
+						if (dir.includes("w")) {
+							const nl = Math.min(Math.max(8, left + dx), Math.max(8, right - MIN_W));
+							width = right - nl;
+							left = nl;
+						}
+						if (dir.includes("n")) {
+							const nt = Math.min(Math.max(8, top + dy), Math.max(8, bottom - MIN_H));
+							height = bottom - nt;
+							top = nt;
+						}
+						setDims({ ...d.base, left, top, width, height });
 					} else {
-						const width = Math.min(Math.max(280, d.base.width + dx), vw - 16);
-						const height = Math.min(Math.max(220, d.base.height + dy), vh - 16);
+						const width = Math.min(Math.max(MIN_W, d.base.width + dx), vw - 16);
+						const height = Math.min(Math.max(MIN_H, d.base.height + dy), vh - 16);
 						setDims({ ...d.base, width, height });
 					}
 				};
@@ -602,6 +630,7 @@ window.__ModuleLoader__.load({
 				React.createElement(
 					"div",
 					{ style: S.head, onPointerDown: (e) => startDrag(e, "move") },
+					React.createElement("span", { style: S.headGrip }),
 					React.createElement("span", { style: S.headIcon }, I.archive),
 					React.createElement("span", { style: S.headTitle }, STR.title),
 					React.createElement("span", { style: S.badge }, STR.count(total)),
@@ -620,12 +649,15 @@ window.__ModuleLoader__.load({
 						)
 					: null,
 				bodyNode,
-				React.createElement("div", {
-					style: S.resizeHandle,
-					onPointerDown: (e) => startDrag(e, "resize"),
-					title: "调整大小 / Resize",
-					"aria-label": "调整大小 / Resize"
-				})
+				// 8-way resize hotspots (transparent; highlighted on hover via CSS).
+				React.createElement("div", { className: "dsh-am-rz", style: S.resizeN, onPointerDown: (e) => startDrag(e, "resize-n"), title: "上边缘拉伸 / Resize top", "aria-label": "Resize top" }),
+				React.createElement("div", { className: "dsh-am-rz", style: S.resizeS, onPointerDown: (e) => startDrag(e, "resize-s"), title: "下边缘拉伸 / Resize bottom", "aria-label": "Resize bottom" }),
+				React.createElement("div", { className: "dsh-am-rz", style: S.resizeE, onPointerDown: (e) => startDrag(e, "resize-e"), title: "右边缘拉伸 / Resize right", "aria-label": "Resize right" }),
+				React.createElement("div", { className: "dsh-am-rz", style: S.resizeW, onPointerDown: (e) => startDrag(e, "resize-w"), title: "左边缘拉伸 / Resize left", "aria-label": "Resize left" }),
+				React.createElement("div", { className: "dsh-am-rz", style: S.resizeNW, onPointerDown: (e) => startDrag(e, "resize-nw"), title: "左上角拉伸 / Resize", "aria-label": "Resize NW" }),
+				React.createElement("div", { className: "dsh-am-rz", style: S.resizeNE, onPointerDown: (e) => startDrag(e, "resize-ne"), title: "右上角拉伸 / Resize", "aria-label": "Resize NE" }),
+				React.createElement("div", { className: "dsh-am-rz", style: S.resizeSW, onPointerDown: (e) => startDrag(e, "resize-sw"), title: "左下角拉伸 / Resize", "aria-label": "Resize SW" }),
+				React.createElement("div", { className: "dsh-am-rz", style: S.resizeSE, onPointerDown: (e) => startDrag(e, "resize-se"), title: "右下角拉伸 / Resize", "aria-label": "Resize SE" })
 			);
 
 			// A small pop animation via a keyframe injected once.
@@ -633,6 +665,13 @@ window.__ModuleLoader__.load({
 				const tag = document.createElement("style");
 				tag.dataset.amPop = "1";
 				tag.textContent = "@keyframes dsh-am-pop{from{opacity:0;transform:translateY(6px) scale(.985)}to{opacity:1;transform:none}}";
+				document.head.appendChild(tag);
+			}
+			// Resize hotspot hover highlight (transparent by default).
+			if (typeof document !== "undefined" && !document.querySelector("style[data-am-rz]")) {
+				const tag = document.createElement("style");
+				tag.dataset.amRz = "1";
+				tag.textContent = ".dsh-am-rz{background:transparent}.dsh-am-rz:hover{background:color-mix(in srgb, var(--dsw-alias-state-business-primary, #3b6ef6) 30%, transparent)}";
 				document.head.appendChild(tag);
 			}
 
