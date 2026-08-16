@@ -1,4 +1,4 @@
-# dsh-archive-manager — Windows install script
+﻿# dsh-archive-manager — Windows install script
 # Copies this plugin into the DSH profile's hoisted node_modules and enables
 # it in the profile's cordis.patch.yml. Requires DSH to be restarted (or the
 # patch HMR to pick the change up) before the plugin activates.
@@ -60,7 +60,15 @@ if ($content -match "dsh-archive-manager") {
       name: dsh-archive-manager
 "@
     $trimmed = $content.TrimEnd()
-    if ($trimmed -eq "" -or $trimmed -eq "[]") {
+    # "Empty" means: after stripping comments/blank lines there are no real
+    # entries, or the only entry is the empty-array marker "[]" (the canonical
+    # template left by dsh init or by a clean uninstall).
+    $meaningful = @($content -split "\r?\n" | Where-Object {
+        $t = $_.Trim()
+        $t -ne "" -and -not $t.StartsWith("#")
+    })
+    $isEmpty = ($meaningful.Count -eq 0) -or ($meaningful.Count -eq 1 -and $meaningful[0].Trim() -eq "[]")
+    if ($isEmpty) {
         # fresh/empty patch file: write the canonical form with comments
         $new = @"
 # Your patch layer for this dsh profile, applied after every bundle layer:
