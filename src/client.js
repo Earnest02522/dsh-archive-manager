@@ -232,7 +232,7 @@ window.__ModuleLoader__.load({
 			},
 			triggerHover: { background: "var(--dsw-alias-interactive-bg-hover, rgba(0,0,0,.05))", color: "var(--dsw-alias-label-primary, #1f2329)" },
 			panel: {
-				position: "fixed", right: 12, bottom: 60, width: 400, maxWidth: "calc(100vw - 24px)",
+				position: "fixed", left: 12, bottom: 60, width: 400, maxWidth: "calc(100vw - 24px)",
 				maxHeight: "min(560px, calc(100vh - 80px))", display: "flex", flexDirection: "column",
 				background: "var(--dsw-alias-bg-elevated, #ffffff)", border: "1px solid var(--dsw-alias-border-l2, #e4e7ec)",
 				borderRadius: 14, boxShadow: "0 12px 32px rgba(0,0,0,.16), 0 2px 8px rgba(0,0,0,.06)",
