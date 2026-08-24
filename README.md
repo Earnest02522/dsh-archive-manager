@@ -37,8 +37,8 @@ conversation.
   avoids the inject/mount self-deadlock (the `archiveManager` namespace is
   mounted by the bundle itself, so it is fetched with `ctx.get(...)` and is
   deliberately not listed in `inject`).
-- **Zero build** — plain ESM/CommonJS-style files, copy-to-install, no
-  compile step.
+- **Zero build** — plain ESM/CommonJS-style files, no compile step; installs
+  through the official `dsh plugin add`.
 - **i18n** — Chinese and English UI text, chosen from the browser language.
 
 ## Why there is no "delete" (and why the plugin does not add one)
@@ -80,13 +80,32 @@ loader (`dsh.client.platform = "web"`).
 
 ## Compatibility
 
-- DeepSeek Harness `0.1.0-rc.x` (tested on `0.1.0-rc.6`, web profile)
+- DeepSeek Harness `0.1.x` — verified end-to-end via `dsh plugin add` on
+  `0.1.1-rc.2` (web profile); peer ranges cover `^0.1.0-rc.6 || ^0.1.1-rc.1`
 - Windows (scripts + Explorer reveal) — the plugin itself is platform-agnostic
   (Finder / xdg-open on macOS / Linux)
 
 ## Install
 
-### One-command install (Windows)
+### Official CLI (recommended)
+
+```powershell
+dsh plugin --profile web add https://github.com/Earnest02522/dsh-archive-manager.git
+```
+
+The package declares a `dsh.bundle` manifest, so `dsh plugin add` installs the
+dependency **and** registers its loader line automatically — no manual patch
+editing needed. From a local checkout, a file path works too:
+
+```powershell
+dsh plugin --profile web add "file:D:\path\to\dsh-archive-manager"
+```
+
+> After install: restart DSH (or let the patch HMR re-compose the config),
+> then hard-refresh the browser (`Ctrl+Shift+R`).
+> Non-default profiles: swap `web` for e.g. `headless` in the command above.
+
+### Windows install script (legacy)
 
 Open PowerShell and `cd` into the repo folder first, then run the script:
 
@@ -129,16 +148,6 @@ no-op.
 3. Restart DSH (or let the patch HMR re-compose the config), then hard-refresh
    the browser (`Ctrl+Shift+R`).
 
-### Via the official CLI (installs the dependency, still needs the patch)
-
-```powershell
-dsh plugin --profile web add "file:<repo>"
-```
-
-`dsh plugin` forwards to pnpm and only auto-activates packages that declare a
-`dsh.bundle`; this UI plugin does not, so it is installed as a plain
-dependency — you still need step 2 (the `cordis.patch.yml` insert) above.
-
 ### Verify
 
 - The sidebar foot now shows an **归档 / Archive** button next to Settings.
@@ -159,13 +168,14 @@ dependency — you still need step 2 (the `cordis.patch.yml` insert) above.
 ## Uninstall
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1
+dsh plugin --profile web remove dsh-archive-manager
 ```
 
-or manually: remove the `dsh-archive-manager` entry from
+then restart DSH. Legacy fallbacks: run
+`powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1`, or manually
+remove the `dsh-archive-manager` loader entry from the profile's
 `cordis.patch.yml` and delete
-`%USERPROFILE%\.dsh\profiles\node_modules\dsh-archive-manager`, then restart
-DSH.
+`%USERPROFILE%\.dsh\profiles\node_modules\dsh-archive-manager`.
 
 ## Development
 

@@ -20,7 +20,7 @@
 - **打开**：一键“恢复 + 打开”（归档中的会话无法保持打开状态，所以打开前会自动先恢复）。
 - **打开对话文件夹**：在系统文件管理器（Windows 资源管理器 / macOS Finder / Linux xdg-open）中打开该会话的转录（transcript）目录（存放 `session.jsonl*` 日志的文件夹），方便你查看或备份原始日志。
 - **安全**：浏览器端代码做了全面防御——不调用插槽未保证提供的 hooks、任何一步失败都不会让整个界面崩溃、远程挂载失败时降级为只读面板；并规避了 inject/自挂载的死锁（`archiveManager` 命名空间由本 bundle 自己挂载，因此用 `ctx.get(...)` 动态获取，**刻意不写进 `inject`**）。
-- **零构建**：纯手写 JS，复制即用，无需编译。
+- **零构建**：纯手写 JS，无需编译；通过官方 `dsh plugin add` 安装。
 - **中英双语**：根据浏览器语言自动切换界面文案。
 
 ## 为什么没有“删除”功能（插件也刻意不做）
@@ -51,12 +51,27 @@
 
 ## 兼容性
 
-- DeepSeek Harness `0.1.0-rc.x`（已在 `0.1.0-rc.6` 的 web profile 上验证）
+- DeepSeek Harness `0.1.x`——已在 `0.1.1-rc.2` 上端到端验证官方 `dsh plugin add` 安装（web profile）；peer 范围覆盖 `^0.1.0-rc.6 || ^0.1.1-rc.1`
 - 附 Windows 安装/卸载脚本（资源管理器打开目录）；插件本身跨平台（macOS Finder / Linux xdg-open）
 
 ## 安装
 
-### 一键安装命令（Windows）
+### 官方 CLI（推荐）
+
+```powershell
+dsh plugin --profile web add https://github.com/Earnest02522/dsh-archive-manager.git
+```
+
+本包声明了 `dsh.bundle` 清单，所以 `dsh plugin add` 会**同时完成依赖安装和 loader 注册**——无需手动编辑 patch 文件。本地检出也可以用文件路径：
+
+```powershell
+dsh plugin --profile web add "file:D:\path\to\dsh-archive-manager"
+```
+
+> 安装后：重启 DSH（或等待 patch HMR 重新组合配置），然后强制刷新浏览器（`Ctrl+Shift+R`）。
+> 非 web profile：把命令中的 `web` 换成例如 `headless`。
+
+### Windows 安装脚本（旧方式）
 
 打开 PowerShell，**先 `cd` 进入仓库目录**，再运行脚本：
 
@@ -94,15 +109,6 @@ powershell -ExecutionPolicy Bypass -File <repo>\scripts\install.ps1 -ProfileName
 
 3. 重启 DSH（或等待 patch HMR 重新组合配置），然后强制刷新浏览器（`Ctrl+Shift+R`）。
 
-### 官方 CLI 方式（只装依赖，仍需手动 patch）
-
-```powershell
-dsh plugin --profile web add "file:<repo>"
-```
-
-`dsh plugin` 转发给 pnpm，且只会自动激活声明了 `dsh.bundle` 的包；本 UI 插件没有该声明，
-所以只会作为普通依赖安装——仍需要上面的第 2 步（`cordis.patch.yml` insert）。
-
 ### 验证是否生效
 
 - 侧边栏底部（设置按钮旁边）出现 **归档 / Archive** 按钮。
@@ -122,11 +128,13 @@ dsh plugin --profile web add "file:<repo>"
 ## 卸载
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1
+dsh plugin --profile web remove dsh-archive-manager
 ```
 
-或手动：删除 `cordis.patch.yml` 中的 `dsh-archive-manager` 条目，
-删除 `%USERPROFILE%\.dsh\profiles\node_modules\dsh-archive-manager`，然后重启 DSH。
+然后重启 DSH。旧方式备用：运行
+`powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1`；
+或手动删除 profile 的 `cordis.patch.yml` 中 `dsh-archive-manager` 条目，
+再删除 `%USERPROFILE%\.dsh\profiles\node_modules\dsh-archive-manager`。
 
 ## 开发
 
