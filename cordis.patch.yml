@@ -1,0 +1,5 @@
+# dsh-archive-manager bundle patch：`dsh plugin add` 安装后自动挂载此 loader 行。
+# 与 scripts/install.ps1 手动写入的条目一致（手动方式仍受支持）。
+- insert:
+    - id: dsh-archive-manager
+      name: 'dsh-archive-manager'
