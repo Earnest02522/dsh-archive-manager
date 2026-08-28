@@ -38,7 +38,7 @@ conversation.
   mounted by the bundle itself, so it is fetched with `ctx.get(...)` and is
   deliberately not listed in `inject`).
 - **Zero build** — plain ESM/CommonJS-style files, no compile step; installs
-  through the official `dsh plugin add`.
+  through the official `dsh plugin add` CLI (no global install needed).
 - **i18n** — Chinese and English UI text, chosen from the browser language.
 
 ## Why there is no "delete" (and why the plugin does not add one)
@@ -80,7 +80,7 @@ loader (`dsh.client.platform = "web"`).
 
 ## Compatibility
 
-- DeepSeek Harness `0.1.x` — verified end-to-end via `dsh plugin add` on
+- DeepSeek Harness `0.1.x` — verified end-to-end via `npx --yes @deepseek-ai/dsh plugin add` on
   `0.1.1-rc.2` (web profile); peer ranges cover `^0.1.0-rc.6 || ^0.1.1-rc.1`
 - Windows (scripts + Explorer reveal) — the plugin itself is platform-agnostic
   (Finder / xdg-open on macOS / Linux)
@@ -90,15 +90,17 @@ loader (`dsh.client.platform = "web"`).
 ### Official CLI (recommended)
 
 ```powershell
-dsh plugin --profile web add https://github.com/Earnest02522/dsh-archive-manager.git
+npx --yes @deepseek-ai/dsh plugin --profile web add https://github.com/Earnest02522/dsh-archive-manager.git
 ```
 
-The package declares a `dsh.bundle` manifest, so `dsh plugin add` installs the
+
+> The `npx --yes @deepseek-ai/dsh` form runs the official CLI **without a global install** — most machines do not have `dsh` on `PATH`, so this is the recommended way. If you already installed the CLI globally (`npm install -g @deepseek-ai/dsh`), plain `dsh plugin ...` works identically.
+The package declares a `dsh.bundle` manifest, so the `plugin add` subcommand installs the
 dependency **and** registers its loader line automatically — no manual patch
 editing needed. From a local checkout, a file path works too:
 
 ```powershell
-dsh plugin --profile web add "file:D:\path\to\dsh-archive-manager"
+npx --yes @deepseek-ai/dsh plugin --profile web add "file:D:\path\to\dsh-archive-manager"
 ```
 
 > After install: restart DSH (or let the patch HMR re-compose the config),
@@ -168,7 +170,7 @@ no-op.
 ## Uninstall
 
 ```powershell
-dsh plugin --profile web remove dsh-archive-manager
+npx --yes @deepseek-ai/dsh plugin --profile web remove dsh-archive-manager
 ```
 
 then restart DSH. Legacy fallbacks: run

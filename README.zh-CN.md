@@ -20,7 +20,7 @@
 - **打开**：一键“恢复 + 打开”（归档中的会话无法保持打开状态，所以打开前会自动先恢复）。
 - **打开对话文件夹**：在系统文件管理器（Windows 资源管理器 / macOS Finder / Linux xdg-open）中打开该会话的转录（transcript）目录（存放 `session.jsonl*` 日志的文件夹），方便你查看或备份原始日志。
 - **安全**：浏览器端代码做了全面防御——不调用插槽未保证提供的 hooks、任何一步失败都不会让整个界面崩溃、远程挂载失败时降级为只读面板；并规避了 inject/自挂载的死锁（`archiveManager` 命名空间由本 bundle 自己挂载，因此用 `ctx.get(...)` 动态获取，**刻意不写进 `inject`**）。
-- **零构建**：纯手写 JS，无需编译；通过官方 `dsh plugin add` 安装。
+- **零构建**：纯手写 JS，无需编译；通过官方 `dsh plugin add` 命令安装（无需全局安装）。
 - **中英双语**：根据浏览器语言自动切换界面文案。
 
 ## 为什么没有“删除”功能（插件也刻意不做）
@@ -51,7 +51,7 @@
 
 ## 兼容性
 
-- DeepSeek Harness `0.1.x`——已在 `0.1.1-rc.2` 上端到端验证官方 `dsh plugin add` 安装（web profile）；peer 范围覆盖 `^0.1.0-rc.6 || ^0.1.1-rc.1`
+- DeepSeek Harness `0.1.x`——已在 `0.1.1-rc.2` 上端到端验证官方 `npx --yes @deepseek-ai/dsh plugin add` 安装（web profile）；peer 范围覆盖 `^0.1.0-rc.6 || ^0.1.1-rc.1`
 - 附 Windows 安装/卸载脚本（资源管理器打开目录）；插件本身跨平台（macOS Finder / Linux xdg-open）
 
 ## 安装
@@ -59,13 +59,15 @@
 ### 官方 CLI（推荐）
 
 ```powershell
-dsh plugin --profile web add https://github.com/Earnest02522/dsh-archive-manager.git
+npx --yes @deepseek-ai/dsh plugin --profile web add https://github.com/Earnest02522/dsh-archive-manager.git
 ```
 
-本包声明了 `dsh.bundle` 清单，所以 `dsh plugin add` 会**同时完成依赖安装和 loader 注册**——无需手动编辑 patch 文件。本地检出也可以用文件路径：
+
+> 用 `npx --yes @deepseek-ai/dsh` 运行官方 CLI **无需全局安装**——大多数机器没有把 `dsh` 加入 `PATH`，所以这是最推荐的方式。如果你已全局安装（`npm install -g @deepseek-ai/dsh`），直接 `dsh plugin ...` 效果相同。
+本包声明了 `dsh.bundle` 清单，所以 `plugin add` 子命令会**同时完成依赖安装和 loader 注册**——无需手动编辑 patch 文件。本地检出也可以用文件路径：
 
 ```powershell
-dsh plugin --profile web add "file:D:\path\to\dsh-archive-manager"
+npx --yes @deepseek-ai/dsh plugin --profile web add "file:D:\path\to\dsh-archive-manager"
 ```
 
 > 安装后：重启 DSH（或等待 patch HMR 重新组合配置），然后强制刷新浏览器（`Ctrl+Shift+R`）。
@@ -128,7 +130,7 @@ powershell -ExecutionPolicy Bypass -File <repo>\scripts\install.ps1 -ProfileName
 ## 卸载
 
 ```powershell
-dsh plugin --profile web remove dsh-archive-manager
+npx --yes @deepseek-ai/dsh plugin --profile web remove dsh-archive-manager
 ```
 
 然后重启 DSH。旧方式备用：运行
