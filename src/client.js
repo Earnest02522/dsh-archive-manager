@@ -234,7 +234,7 @@ window.__ModuleLoader__.load({
 			panel: {
 				position: "fixed", left: 12, bottom: 60, width: 400, maxWidth: "calc(100vw - 24px)",
 				maxHeight: "min(560px, calc(100vh - 80px))", display: "flex", flexDirection: "column",
-				background: "var(--dsw-alias-bg-elevated, #ffffff)", border: "1px solid var(--dsw-alias-border-l2, #e4e7ec)",
+				background: "var(--dsw-alias-bg-layer-1)", border: "1px solid var(--dsw-alias-border-l2, #e4e7ec)",
 				borderRadius: 14, boxShadow: "0 12px 32px rgba(0,0,0,.16), 0 2px 8px rgba(0,0,0,.06)",
 				zIndex: 2000, overflow: "hidden", animation: "dsh-am-pop .18s ease"
 			},
