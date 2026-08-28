@@ -87,14 +87,27 @@ loader (`dsh.client.platform = "web"`).
 
 ## Install
 
-### Official CLI (recommended)
+### Official CLI — npx (recommended, no global install)
 
 ```powershell
 npx --yes @deepseek-ai/dsh plugin --profile web add https://github.com/Earnest02522/dsh-archive-manager.git
 ```
 
 
-> The `npx --yes @deepseek-ai/dsh` form runs the official CLI **without a global install** — most machines do not have `dsh` on `PATH`, so this is the recommended way. If you already installed the CLI globally (`npm install -g @deepseek-ai/dsh`), plain `dsh plugin ...` works identically.
+`npx --yes @deepseek-ai/dsh` runs the official CLI straight from the npx cache,
+so **no global install is needed** — most machines do not have `dsh` on `PATH`.
+
+### Or: global install, then plain `dsh`
+
+If you prefer to have the CLI installed globally (or already do):
+
+```powershell
+npm install -g @deepseek-ai/dsh
+dsh plugin --profile web add https://github.com/Earnest02522/dsh-archive-manager.git
+```
+
+Both forms are equivalent; the rest of this page uses the npx form.
+
 The package declares a `dsh.bundle` manifest, so the `plugin add` subcommand installs the
 dependency **and** registers its loader line automatically — no manual patch
 editing needed. From a local checkout, a file path works too:
@@ -171,6 +184,8 @@ no-op.
 
 ```powershell
 npx --yes @deepseek-ai/dsh plugin --profile web remove dsh-archive-manager
+# with a global install, the equivalent is:
+#   dsh plugin --profile web remove dsh-archive-manager
 ```
 
 then restart DSH. Legacy fallbacks: run

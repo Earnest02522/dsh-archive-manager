@@ -56,14 +56,26 @@
 
 ## 安装
 
-### 官方 CLI（推荐）
+### 官方 CLI —— npx 方式（推荐，无需全局安装）
 
 ```powershell
 npx --yes @deepseek-ai/dsh plugin --profile web add https://github.com/Earnest02522/dsh-archive-manager.git
 ```
 
 
-> 用 `npx --yes @deepseek-ai/dsh` 运行官方 CLI **无需全局安装**——大多数机器没有把 `dsh` 加入 `PATH`，所以这是最推荐的方式。如果你已全局安装（`npm install -g @deepseek-ai/dsh`），直接 `dsh plugin ...` 效果相同。
+`npx --yes @deepseek-ai/dsh` 直接从 npx 缓存运行官方 CLI，**无需全局安装**——大多数机器没有把 `dsh` 加入 `PATH`。
+
+### 或：全局安装后用 `dsh`
+
+如果你希望（或已经）全局安装 CLI：
+
+```powershell
+npm install -g @deepseek-ai/dsh
+dsh plugin --profile web add https://github.com/Earnest02522/dsh-archive-manager.git
+```
+
+两种方式等价；下文命令使用 npx 形式。
+
 本包声明了 `dsh.bundle` 清单，所以 `plugin add` 子命令会**同时完成依赖安装和 loader 注册**——无需手动编辑 patch 文件。本地检出也可以用文件路径：
 
 ```powershell
@@ -131,6 +143,8 @@ powershell -ExecutionPolicy Bypass -File <repo>\scripts\install.ps1 -ProfileName
 
 ```powershell
 npx --yes @deepseek-ai/dsh plugin --profile web remove dsh-archive-manager
+# 若已全局安装，等价写法：
+#   dsh plugin --profile web remove dsh-archive-manager
 ```
 
 然后重启 DSH。旧方式备用：运行
