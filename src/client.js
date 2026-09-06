@@ -35,7 +35,7 @@ window.__ModuleLoader__.load({
 		var exports = module.exports;
 
 		const React = require("react");
-		const { useSyncExternalStore, useState, useMemo, useCallback, useRef } = React;
+		const { useSyncExternalStore, useState, useMemo, useCallback, useEffect, useRef } = React;
 
 		// ---------------------------------------------------------------- locale
 		const isZh = typeof navigator !== "undefined" && navigator.language && navigator.language.toLowerCase().startsWith("zh");
@@ -350,6 +350,21 @@ window.__ModuleLoader__.load({
 			const [dims, setDims] = useState(null); // {left, top, width, height} once moved/resized
 			const dragRef = useRef(null);           // {mode, startX, startY, base}
 			const panelRef = useRef(null);
+
+			// Clicking anywhere outside the panel closes it, mirroring the
+			// native dsh settings surface. Capture phase: an in-panel handler
+			// can never swallow the check, and the trigger button is unmounted
+			// while the panel is open, so no toggle race exists.
+			useEffect(() => {
+				if (!open) return;
+				const onPointerDown = (e) => {
+					const el = panelRef.current;
+					if (el && e.target instanceof Node && !el.contains(e.target)) setOpen(false);
+				};
+				document.addEventListener("pointerdown", onPointerDown, true);
+				return () => document.removeEventListener("pointerdown", onPointerDown, true);
+			}, [open]);
+
 			const MIN_W = 280, MIN_H = 220;
 			const startDrag = useCallback((e, mode) => {
 				if (mode === "move" && e.target && e.target.closest && e.target.closest("button")) return;
