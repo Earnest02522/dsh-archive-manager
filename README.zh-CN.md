@@ -4,23 +4,28 @@
 
 为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 提供**归档会话管理**的插件：
 在侧边栏底部新增入口，弹出面板**按工作区归类**列出所有已归档的会话，支持
-**查看（打开）**、**恢复（取消归档）**，以及**打开对话文件夹**（在文件管理器里定位该会话的原始日志目录）。
+**恢复（单条 / 批量）**，以及**打开对话文件夹**（在文件管理器里定位该会话的原始日志目录）。
 
-> **背景。** DSH 自带“归档会话”功能（把会话 id 加入全局 `archivedSessionIds` 集合，从侧边栏隐藏），
-> 但**没有提供查看归档列表的界面，也没有任何取消归档（unarchive）的 API**——
-> 官方 `dsh-client-ui-workspace` 的 README 明确把“no viewing or unarchive surface”列为已知缺口。
-> 同时，DSH 的会话日志（`session.jsonl*`）**永远不会被删除**（持久化层没有删除接口），
-> 所以“恢复”的本质就是：把这个会话 id 从归档集合里移除。
-> 本插件以标准 cordis 插件的形式实现这件事，**不改动任何 DSH 核心代码**。
+> **新版内置能力说明（DSH 0.2.x）。** 新版 DSH 已自带“归档会话”操作、归档过滤（`default` / `show` / `only`）、
+> 置顶（pin）以及原生 `unarchiveSession` API。本插件不重复造这些轮子，而是补齐它们没有做的：
+>
+> - **批量恢复**：“恢复全部”按钮一次调用恢复所有归档会话，而不是逐条点击。
+> - **打开会话转录文件夹**：定位该会话 `session.jsonl*` 日志所在目录——官方内置的“reveal”打开的是**工作区**目录，不是会话日志目录。
+> - **一键归档总览**：按工作区分组显示并带数量统计。
+> - **兼容 DSH 0.1.x**：0.1.x 既没有归档过滤也没有 unarchive API，本插件为其补齐这些能力。
+>
+> 浏览器端做了跨版本防御：DSH 0.2 移除了客户端 `sessions.open`，因此面板不会假设它存在——
+> 没有 opener 时降级提示“已恢复，请在侧边栏打开”。
 
 ## 功能
 
 - **查看（按工作区分组）**：点击侧边栏底部的“归档”按钮，弹出面板；归档会话按所属工作区（Workspace）分组显示（没有归属的归入“未分组”），每行展示标题、短 id 与最后更新时间。
 - **恢复**：一键把会话从归档集合中移除并持久化，会话立刻回到侧边栏原位。
-- **打开**：一键“恢复 + 打开”（归档中的会话无法保持打开状态，所以打开前会自动先恢复）。
+- **批量恢复**：「恢复全部」一次性恢复所有归档会话（通过插件的 `unarchiveMany` 端点；不可用时自动逐条回退）。
+- **恢复并打开**：恢复后尝试打开会话；在 DSH 0.2（已移除客户端 `sessions.open`）上则恢复并提示你从侧边栏打开。
 - **打开对话文件夹**：在系统文件管理器（Windows 资源管理器 / macOS Finder / Linux xdg-open）中打开该会话的转录（transcript）目录（存放 `session.jsonl*` 日志的文件夹），方便你查看或备份原始日志。
 - **安全**：浏览器端代码做了全面防御——不调用插槽未保证提供的 hooks、任何一步失败都不会让整个界面崩溃、远程挂载失败时降级为只读面板；并规避了 inject/自挂载的死锁（`archiveManager` 命名空间由本 bundle 自己挂载，因此用 `ctx.get(...)` 动态获取，**刻意不写进 `inject`**）。
-- **零构建**：纯手写 JS，无需编译；通过官方 `dsh plugin add` 命令安装（无需全局安装）。
+- **零构建**：纯手写 JS，无需编译；通过官方 `dsh plugin add` 命令或仓库自带脚本安装。
 - **中英双语**：根据浏览器语言自动切换界面文案。
 
 ## 为什么没有“删除”功能（插件也刻意不做）
@@ -51,7 +56,8 @@
 
 ## 兼容性
 
-- DeepSeek Harness `0.1.x`——已在 `0.1.1-rc.2` 上端到端验证官方 `npx --yes @deepseek-ai/dsh plugin add` 安装（web profile）；peer 范围覆盖 `^0.1.0-rc.6 || ^0.1.1-rc.1`
+- **DSH 0.2.x（桌面版）**——v0.5.0 的主要适配目标：优先调用原生 `workspaceRegistry.unarchiveSession()`；读取 0.2 的 `sessionPersistence.list()` 快照结构（`{ header, revision, sizeBytes }`）与 `stat(id)`；兼容已移除的客户端 `sessions.open`。
+- **DSH 0.1.x（web）**——完整支持：回退为通过 registry 操作队列从 `archivedSessionIds` 移除，并接受旧版裸 header 的 `list()` 结构；已在 `0.1.1-rc.2` 上端到端验证。
 - 附 Windows 安装/卸载脚本（资源管理器打开目录）；插件本身跨平台（macOS Finder / Linux xdg-open）
 
 ## 安装
@@ -59,9 +65,10 @@
 ### 官方 CLI —— npx 方式（推荐，无需全局安装）
 
 ```powershell
-npx --yes @deepseek-ai/dsh plugin --profile web add https://github.com/Earnest02522/dsh-archive-manager.git
+npx --yes @deepseek-ai/dsh plugin --profile desktop add https://github.com/Earnest02522/dsh-archive-manager.git
 ```
 
+桌面版的 profile 名是 `desktop`；旧版 web 安装请用 `--profile web`。
 
 `npx --yes @deepseek-ai/dsh` 直接从 npx 缓存运行官方 CLI，**无需全局安装**——大多数机器没有把 `dsh` 加入 `PATH`。
 
@@ -71,7 +78,7 @@ npx --yes @deepseek-ai/dsh plugin --profile web add https://github.com/Earnest02
 
 ```powershell
 npm install -g @deepseek-ai/dsh
-dsh plugin --profile web add https://github.com/Earnest02522/dsh-archive-manager.git
+dsh plugin --profile desktop add https://github.com/Earnest02522/dsh-archive-manager.git
 ```
 
 两种方式等价；下文命令使用 npx 形式。
@@ -79,7 +86,7 @@ dsh plugin --profile web add https://github.com/Earnest02522/dsh-archive-manager
 本包声明了 `dsh.bundle` 清单，所以 `plugin add` 子命令会**同时完成依赖安装和 loader 注册**——无需手动编辑 patch 文件。本地检出也可以用文件路径：
 
 ```powershell
-npx --yes @deepseek-ai/dsh plugin --profile web add "file:D:\path\to\dsh-archive-manager"
+npx --yes @deepseek-ai/dsh plugin --profile desktop add "file:D:\path\to\dsh-archive-manager"
 ```
 
 > 安装后：重启 DSH（或等待 patch HMR 重新组合配置），然后强制刷新浏览器（`Ctrl+Shift+R`）。
@@ -99,21 +106,35 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 ```powershell
 powershell -ExecutionPolicy Bypass -File <repo>\scripts\install.ps1
 # 非默认 profile：
-powershell -ExecutionPolicy Bypass -File <repo>\scripts\install.ps1 -ProfileName headless
+powershell -ExecutionPolicy Bypass -File <repo>\scripts\install.ps1 -ProfileName desktop
 ```
 
-脚本会把插件复制到 `%USERPROFILE%\.dsh\profiles\node_modules\dsh-archive-manager`，
-并在 `%USERPROFILE%\.dsh\profiles\web\cordis.patch.yml` 中启用它（会先备份原 patch 文件）。
-若条目已存在则为无操作。
+脚本会自动识别 profile（0.2.x 为 `desktop`，0.1.x 为 `web`）和插件目录
+（`<profile>/node_modules`，回退到共享的 `profiles/node_modules`），把插件复制进去，并在
+profile 的 `cordis.patch.yml` 中启用（会先备份原 patch 文件）。若条目已存在则为无操作。
 
 > 安装后：重启 DSH（或等待 patch HMR 重新组合配置），然后强制刷新浏览器（`Ctrl+Shift+R`）。
+
+### Linux / macOS 安装脚本
+
+仓库同样附带 bash 安装脚本（自动识别逻辑相同）：
+
+```bash
+cd <仓库路径>              # 例如 cd ~/dsh-archive-manager
+bash scripts/install.sh
+# 非默认 profile / scoped 包名：
+bash scripts/install.sh web "@earnest020522/dsh-archive-manager"
+```
+
+脚本优先使用 `$DSH_HOME`，否则 `~/.dsh`，并自动处理空模板 `[]` 的 patch 文件。
 
 ### 手动安装
 
 1. 把整个仓库文件夹复制到
-   `%USERPROFILE%\.dsh\profiles\node_modules\dsh-archive-manager`
-   （该目录是 loader 的共享解析根，没有就创建）。
-2. 编辑 `%USERPROFILE%\.dsh\profiles\web\cordis.patch.yml`，在末尾追加：
+   `%USERPROFILE%\.dsh\profiles\desktop\node_modules\dsh-archive-manager`
+   （DSH 0.2.x；0.1.x 则用共享目录
+   `%USERPROFILE%\.dsh\profiles\node_modules\dsh-archive-manager`）。
+2. 编辑 `%USERPROFILE%\.dsh\profiles\desktop\cordis.patch.yml`，在末尾追加：
 
    ```yaml
    - insert:
@@ -142,9 +163,9 @@ powershell -ExecutionPolicy Bypass -File <repo>\scripts\install.ps1 -ProfileName
 ## 卸载
 
 ```powershell
-npx --yes @deepseek-ai/dsh plugin --profile web remove dsh-archive-manager
+npx --yes @deepseek-ai/dsh plugin --profile desktop remove dsh-archive-manager
 # 若已全局安装，等价写法：
-#   dsh plugin --profile web remove dsh-archive-manager
+#   dsh plugin --profile desktop remove dsh-archive-manager
 ```
 
 然后重启 DSH。旧方式备用：运行

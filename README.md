@@ -4,19 +4,28 @@
 
 A plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) that adds
 **archived-conversation management**: a sidebar entry that lists your archived
-conversations — **grouped by workspace** — and lets you **view** (open),
-**restore** (unarchive), or **reveal the transcript folder** of any archived
+conversations — **grouped by workspace** — and lets you **restore** them
+(single or **bulk**) or **reveal the transcript folder** of any archived
 conversation.
 
-> **Background.** DSH has a built-in *Archive session* action (it hides a
-> conversation from the sidebar by adding its id to the registry-global
-> `archivedSessionIds` set), but it ships **no way to view archived sessions
-> and no unarchive API** — the shipped `dsh-client-ui-workspace` README lists
-> "no viewing or unarchive surface" as a known gap. The underlying transcript
-> (`session.jsonl*`) is **never deleted** by any DSH code (the persistence seam
-> has no delete interface), so *restore* is exactly: remove one session id from
-> the archive set. This plugin implements exactly that, as a normal cordis
-> plugin — no core modifications.
+> **What the built-in features cover (DSH 0.2.x).** Modern DSH ships an
+> *Archive session* action, an archived filter (`default` / `show` / `only`),
+> pinning, and a native `unarchiveSession` API. This plugin does not replace
+> those — it adds what they do not do:
+>
+> - **Bulk restore** — a *Restore all* button restores every archived
+>   conversation in one call instead of one-by-one.
+> - **Reveal the transcript folder** of an archived session (the directory
+>   holding its `session.jsonl*` log). The built-in *reveal* targets the
+>   **workspace** directory, not the session log.
+> - **A one-click archived overview** grouped by workspace with per-group
+>   counts.
+> - **DSH 0.1.x support** — on 0.1.x there is no archive filter and no
+>   unarchive API at all; this plugin provides them.
+>
+> The browser half is defensive across versions: DSH 0.2 removed
+> `sessions.open`, so the panel never assumes it exists and degrades to a
+> "restored — open it from the sidebar" notice when no opener is wired.
 
 ## Features
 
@@ -26,8 +35,12 @@ conversation.
   "Ungrouped"), each row showing title, short id and last-updated time.
 - **Restore** — one click removes the session from the archive set durably;
   the session reappears in the sidebar at its original position.
-- **Open** — *restore + open* in one step (an archived session cannot stay
-  open, so opening first unarchives it).
+- **Bulk restore** — *Restore all* restores every archived conversation at
+  once through the plugin's `unarchiveMany` endpoint (falls back to
+  one-by-one when the bulk endpoint is unavailable).
+- **Restore & open** — restores and then opens the conversation; on DSH 0.2
+  (which removed the client `sessions.open`) it restores and tells you to
+  open it from the sidebar instead.
 - **Open conversation folder** — reveals the session's transcript directory
   (the folder holding its `session.jsonl*` log) in your platform file manager
   (Explorer / Finder / xdg-open), so you can inspect or back up the raw log.
@@ -38,7 +51,7 @@ conversation.
   mounted by the bundle itself, so it is fetched with `ctx.get(...)` and is
   deliberately not listed in `inject`).
 - **Zero build** — plain ESM/CommonJS-style files, no compile step; installs
-  through the official `dsh plugin add` CLI (no global install needed).
+  through the official `dsh plugin add` CLI or the bundled scripts.
 - **i18n** — Chinese and English UI text, chosen from the browser language.
 
 ## Why there is no "delete" (and why the plugin does not add one)
@@ -80,8 +93,13 @@ loader (`dsh.client.platform = "web"`).
 
 ## Compatibility
 
-- DeepSeek Harness `0.1.x` — verified end-to-end via `npx --yes @deepseek-ai/dsh plugin add` on
-  `0.1.1-rc.2` (web profile); peer ranges cover `^0.1.0-rc.6 || ^0.1.1-rc.1`
+- **DSH 0.2.x (desktop app)** — the primary target of v0.5.0. Uses the native
+  `workspaceRegistry.unarchiveSession()` when present, reads the 0.2
+  `sessionPersistence.list()` snapshot shape (`{ header, revision, sizeBytes }`)
+  and `stat(id)`, and tolerates the removed client `sessions.open`.
+- **DSH 0.1.x (web)** — fully supported: falls back to removing the id from
+  `archivedSessionIds` through the registry op queue and accepts the legacy
+  bare-header `list()` shape. Verified end-to-end on `0.1.1-rc.2`.
 - Windows (scripts + Explorer reveal) — the plugin itself is platform-agnostic
   (Finder / xdg-open on macOS / Linux)
 
@@ -90,9 +108,11 @@ loader (`dsh.client.platform = "web"`).
 ### Official CLI — npx (recommended, no global install)
 
 ```powershell
-npx --yes @deepseek-ai/dsh plugin --profile web add https://github.com/Earnest02522/dsh-archive-manager.git
+npx --yes @deepseek-ai/dsh plugin --profile desktop add https://github.com/Earnest02522/dsh-archive-manager.git
 ```
 
+The desktop app's profile is `desktop`; on older web installs use
+`--profile web`.
 
 `npx --yes @deepseek-ai/dsh` runs the official CLI straight from the npx cache,
 so **no global install is needed** — most machines do not have `dsh` on `PATH`.
@@ -103,7 +123,7 @@ If you prefer to have the CLI installed globally (or already do):
 
 ```powershell
 npm install -g @deepseek-ai/dsh
-dsh plugin --profile web add https://github.com/Earnest02522/dsh-archive-manager.git
+dsh plugin --profile desktop add https://github.com/Earnest02522/dsh-archive-manager.git
 ```
 
 Both forms are equivalent; the rest of this page uses the npx form.
@@ -113,7 +133,7 @@ dependency **and** registers its loader line automatically — no manual patch
 editing needed. From a local checkout, a file path works too:
 
 ```powershell
-npx --yes @deepseek-ai/dsh plugin --profile web add "file:D:\path\to\dsh-archive-manager"
+npx --yes @deepseek-ai/dsh plugin --profile desktop add "file:D:\path\to\dsh-archive-manager"
 ```
 
 > After install: restart DSH (or let the patch HMR re-compose the config),
@@ -134,25 +154,39 @@ Or from anywhere, with the repo at `<repo>`:
 ```powershell
 powershell -ExecutionPolicy Bypass -File <repo>\scripts\install.ps1
 # non-default profile:
-powershell -ExecutionPolicy Bypass -File <repo>\scripts\install.ps1 -ProfileName headless
+powershell -ExecutionPolicy Bypass -File <repo>\scripts\install.ps1 -ProfileName desktop
 ```
 
-The script copies the plugin into
-`%USERPROFILE%\.dsh\profiles\node_modules\dsh-archive-manager` and enables it
-in `%USERPROFILE%\.dsh\profiles\web\cordis.patch.yml` (a timestamped backup of
-the patch file is created first). If the plugin entry already exists it is a
-no-op.
+The script auto-detects the profile (`desktop` on DSH 0.2.x, `web` on 0.1.x)
+and the plugin directory (`<profile>/node_modules`, falling back to the
+hoisted `profiles/node_modules`), copies the plugin in, and enables it in the
+profile's `cordis.patch.yml` (a timestamped backup of the patch file is created
+first). If the plugin entry already exists it is a no-op.
 
 > After install: restart DSH (or let the patch HMR re-compose the config),
 > then hard-refresh the browser (`Ctrl+Shift+R`).
 
+### Linux / macOS install script
+
+The repo also bundles a bash installer with the same auto-detection:
+
+```bash
+cd <path-to-repo>          # e.g. cd ~/dsh-archive-manager
+bash scripts/install.sh
+# non-default profile / scoped package name:
+bash scripts/install.sh web "@earnest020522/dsh-archive-manager"
+```
+
+It uses `$DSH_HOME` when set, otherwise `~/.dsh`, and handles the empty
+`[]` patch template automatically.
+
 ### Manual install
 
 1. Copy this folder to
-   `%USERPROFILE%\.dsh\profiles\node_modules\dsh-archive-manager`
-   (create the folder if needed; the profile's `node_modules` is the hoisted
-   resolution root for the loader).
-2. Edit `%USERPROFILE%\.dsh\profiles\web\cordis.patch.yml` and append:
+   `%USERPROFILE%\.dsh\profiles\desktop\node_modules\dsh-archive-manager`
+   (DSH 0.2.x; on 0.1.x use the hoisted
+   `%USERPROFILE%\.dsh\profiles\node_modules\dsh-archive-manager`).
+2. Edit `%USERPROFILE%\.dsh\profiles\desktop\cordis.patch.yml` and append:
 
    ```yaml
    - insert:
@@ -183,9 +217,9 @@ no-op.
 ## Uninstall
 
 ```powershell
-npx --yes @deepseek-ai/dsh plugin --profile web remove dsh-archive-manager
+npx --yes @deepseek-ai/dsh plugin --profile desktop remove dsh-archive-manager
 # with a global install, the equivalent is:
-#   dsh plugin --profile web remove dsh-archive-manager
+#   dsh plugin --profile desktop remove dsh-archive-manager
 ```
 
 then restart DSH. Legacy fallbacks: run

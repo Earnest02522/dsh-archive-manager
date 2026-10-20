@@ -1,28 +1,51 @@
 # dsh-archive-manager - Windows uninstall script
+#
 # Removes the plugin entry from the profile's cordis.patch.yml and deletes the
-# plugin package from the profile's hoisted node_modules.
+# plugin package from the profile's plugin directory. Supports both layouts:
+#   - DSH 0.2.x desktop: <profile>/node_modules
+#   - DSH 0.1.x web:     profiles/node_modules (hoisted)
 #
 # IMPORTANT: the patch overlay must ALWAYS remain a top-level YAML array. After
 # the entry is removed, an otherwise-empty overlay is written back as the
 # canonical empty form ("[]"); otherwise DSH refuses to boot with
 # "must be a top-level YAML array of loader patch entries".
 #
-# Idempotent: running it when the plugin is not installed is a safe no-op (it
-# even repairs a patch file left as comments-only by an older buggy uninstall).
+# Idempotent: running it when the plugin is not installed is a safe no-op.
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1
-#   powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1 -ProfileName headless
+#   powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1 -ProfileName web
+#   powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1 -PluginName "@earnest020522/dsh-archive-manager"
 param(
-    [string]$ProfileName = "web"
+    [string]$ProfileName = "",
+    [string]$PluginName = "dsh-archive-manager"
 )
 
 $ErrorActionPreference = "Stop"
 
 $dshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $HOME ".dsh" }
-$profilesNodeModules = Join-Path $dshHome "profiles\node_modules"
-$profileDir = Join-Path $dshHome ("profiles\" + $ProfileName)
-$dest = Join-Path $profilesNodeModules "dsh-archive-manager"
+$profilesDir = Join-Path $dshHome "profiles"
+
+if ([string]::IsNullOrWhiteSpace($ProfileName)) {
+    if (Test-Path (Join-Path $profilesDir "desktop")) { $ProfileName = "desktop" }
+    elseif (Test-Path (Join-Path $profilesDir "web")) { $ProfileName = "web" }
+    else {
+        $first = Get-ChildItem $profilesDir -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ne "node_modules" } | Select-Object -First 1
+        if ($null -eq $first) { Write-Error "No DSH profile found under $profilesDir" }
+        $ProfileName = $first.Name
+    }
+}
+
+$profileDir = Join-Path $profilesDir $ProfileName
+$nodeModules = Join-Path $profileDir "node_modules"
+if (-not (Test-Path $nodeModules)) { $nodeModules = Join-Path $profilesDir "node_modules" }
+$scopeSplit = $PluginName.Split("/")
+if ($PluginName.StartsWith("@") -and $scopeSplit.Length -eq 2) {
+    $dest = Join-Path (Join-Path $nodeModules $scopeSplit[0]) $scopeSplit[1]
+} else {
+    $dest = Join-Path $nodeModules $PluginName
+}
 $patchFile = Join-Path $profileDir "cordis.patch.yml"
 
 # Canonical empty overlay (the same template dsh writes when initializing a profile).
@@ -36,6 +59,7 @@ $EMPTY_PATCH = @(
 Write-Host "==> dsh-archive-manager uninstaller" -ForegroundColor Cyan
 Write-Host "    DSH home        : $dshHome"
 Write-Host "    Profile         : $ProfileName"
+Write-Host "    Plugin target   : $dest"
 
 # 1) remove the entry from cordis.patch.yml (backup first)
 if (Test-Path -LiteralPath $patchFile) {
@@ -50,12 +74,9 @@ if (Test-Path -LiteralPath $patchFile) {
         $out.Add($line)
     }
     $new = ($out -join "`n")
-    # Collapse empty "- insert:" blocks left behind by the removal: at EOF
-    # (with or without a trailing newline) or before the next top-level item.
     $new = $new -replace "(?m)^- insert:[ \t]*\r?\n?(?=[ \t\r\n]*\z)", ""
     $new = $new -replace "(?m)^- insert:[ \t]*\r?\n(?=(?:[ \t]*\r?\n)*(?=- |\z))", ""
 
-    # Does the file still hold real entries (non-comment, non-blank lines)?
     $significant = @($new -split "`r?`n" | Where-Object {
         $t = $_.Trim()
         $t -ne "" -and -not $t.StartsWith("#")
@@ -69,7 +90,6 @@ if (Test-Path -LiteralPath $patchFile) {
         Copy-Item -LiteralPath $patchFile -Destination $backup -Force
         Write-Host "    backup: $backup"
         if ($significant.Count -eq 0) {
-            # Comments/whitespace only -> must be a top-level YAML array, use "[]".
             Set-Content -LiteralPath $patchFile -Value $EMPTY_PATCH -Encoding UTF8
             Write-Host "    entry removed; overlay reset to canonical empty [] form" -ForegroundColor Green
         } else {

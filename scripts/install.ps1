@@ -1,41 +1,67 @@
-﻿# dsh-archive-manager — Windows install script
-# Copies this plugin into the DSH profile's hoisted node_modules and enables
-# it in the profile's cordis.patch.yml. Requires DSH to be restarted (or the
-# patch HMR to pick the change up) before the plugin activates.
+# dsh-archive-manager — Windows install script
+#
+# Copies this plugin into the DSH profile's plugin directory and enables it in
+# the profile's cordis.patch.yml. Supports both DSH layouts:
+#   - DSH 0.2.x desktop: <profile>/node_modules
+#   - DSH 0.1.x web:     profiles/node_modules (hoisted)
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
-#   powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -ProfileName headless
+#   powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -ProfileName web
+#   powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -PluginName "@earnest020522/dsh-archive-manager"
 param(
-    [string]$ProfileName = "web"
+    [string]$ProfileName = "",
+    [string]$PluginName = "dsh-archive-manager"
 )
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $dshHome = if ($env:DSH_HOME) { $env:DSH_HOME } else { Join-Path $HOME ".dsh" }
-$profilesNodeModules = Join-Path $dshHome "profiles\node_modules"
-$profileDir = Join-Path $dshHome ("profiles\" + $ProfileName)
-$dest = Join-Path $profilesNodeModules "dsh-archive-manager"
+$profilesDir = Join-Path $dshHome "profiles"
+
+# Auto-detect the profile: prefer an explicit -ProfileName, else the desktop
+# profile (DSH 0.2.x), else web (0.1.x), else the first profile present.
+if ([string]::IsNullOrWhiteSpace($ProfileName)) {
+    if (Test-Path (Join-Path $profilesDir "desktop")) { $ProfileName = "desktop" }
+    elseif (Test-Path (Join-Path $profilesDir "web")) { $ProfileName = "web" }
+    else {
+        $first = Get-ChildItem $profilesDir -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -ne "node_modules" } | Select-Object -First 1
+        if ($null -eq $first) { Write-Error "No DSH profile found under $profilesDir" }
+        $ProfileName = $first.Name
+    }
+}
+
+$profileDir = Join-Path $profilesDir $ProfileName
+# DSH 0.2.x keeps a per-profile node_modules; 0.1.x used the hoisted one.
+$nodeModules = Join-Path $profileDir "node_modules"
+if (-not (Test-Path $nodeModules)) { $nodeModules = Join-Path $profilesDir "node_modules" }
+
+# Scoped names install under node_modules/@scope/name; bare names directly.
+$scopeSplit = $PluginName.Split("/")
+if ($PluginName.StartsWith("@") -and $scopeSplit.Length -eq 2) {
+    $dest = Join-Path (Join-Path $nodeModules $scopeSplit[0]) $scopeSplit[1]
+} else {
+    $dest = Join-Path $nodeModules $PluginName
+}
 $patchFile = Join-Path $profileDir "cordis.patch.yml"
 
 Write-Host "==> dsh-archive-manager installer" -ForegroundColor Cyan
 Write-Host "    DSH home        : $dshHome"
 Write-Host "    Profile         : $ProfileName"
+Write-Host "    Plugin name     : $PluginName"
 Write-Host "    Plugin target   : $dest"
 Write-Host "    Patch file      : $patchFile"
 
-if (-not (Test-Path $profileDir)) {
-    Write-Error "Profile directory not found: $profileDir"
-}
-if (-not (Test-Path $profilesNodeModules)) {
-    Write-Error "Profiles node_modules not found: $profilesNodeModules (is DSH installed?)"
-}
+if (-not (Test-Path $profileDir)) { Write-Error "Profile directory not found: $profileDir" }
+if (-not (Test-Path $nodeModules)) { Write-Error "Plugin node_modules not found: $nodeModules (is DSH installed?)" }
+if (-not (Test-Path $patchFile)) { Write-Error "Patch file not found: $patchFile" }
 
 # 1) copy the plugin package
 Write-Host "==> Copying plugin files..." -ForegroundColor Cyan
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
-foreach ($item in @("package.json", "src", "LICENSE", "README.md", "README.zh-CN.md")) {
+foreach ($item in @("package.json", "cordis.patch.yml", "src", "LICENSE", "README.md", "README.zh-CN.md")) {
     $src = Join-Path $repoRoot $item
     if (Test-Path $src) {
         Copy-Item -Path $src -Destination $dest -Recurse -Force
@@ -50,35 +76,23 @@ Copy-Item -Path $patchFile -Destination $backup -Force
 Write-Host "    backup: $backup"
 
 $content = Get-Content -Path $patchFile -Raw -Encoding UTF8
-if ($content -match "dsh-archive-manager") {
+if ($content -match [regex]::Escape($PluginName)) {
     Write-Host "    already enabled, nothing to change" -ForegroundColor Yellow
 } else {
-    $entry = @"
-
-- insert:
-    - id: dsh-archive-manager
-      name: dsh-archive-manager
-"@
+    $entry = "`n- insert:`n    - id: dsh-archive-manager`n      name: $PluginName`n"
     $trimmed = $content.TrimEnd()
-    # "Empty" means: after stripping comments/blank lines there are no real
-    # entries, or the only entry is the empty-array marker "[]" (the canonical
-    # template left by dsh init or by a clean uninstall).
     $meaningful = @($content -split "\r?\n" | Where-Object {
         $t = $_.Trim()
         $t -ne "" -and -not $t.StartsWith("#")
     })
     $isEmpty = ($meaningful.Count -eq 0) -or ($meaningful.Count -eq 1 -and $meaningful[0].Trim() -eq "[]")
     if ($isEmpty) {
-        # fresh/empty patch file: write the canonical form with comments
-        $new = @"
-# Your patch layer for this dsh profile, applied after every bundle layer:
-# a top-level YAML array of loader patch entries (id-targeted config
-# overrides, disables, and insert lists; ``!!js`` expressions allowed).
-$entry
-"@
+        $new = "# Your patch layer for this dsh profile, applied after every bundle layer:`n" +
+               "# a top-level YAML array of loader patch entries (id-targeted config`n" +
+               "# overrides, disables, and insert lists; ``!!js`` expressions allowed).`n" +
+               $entry
     } else {
-        # append to existing entries
-        $new = $trimmed + "`n" + $entry + "`n"
+        $new = $trimmed + "`n" + $entry
     }
     Set-Content -Path $patchFile -Value $new -Encoding UTF8 -NoNewline
     Write-Host "    enabled (insert added)"
@@ -88,5 +102,5 @@ Write-Host "==> Done." -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  1. Restart DSH (or let the patch HMR re-compose the config)."
-Write-Host "  2. Hard-refresh the browser (Ctrl+Shift+R)."
+Write-Host "  2. Hard-refresh the browser/desktop window (Ctrl+Shift+R)."
 Write-Host "  3. Look for the '归档 / Archive' button at the bottom of the sidebar."

@@ -54,6 +54,9 @@ window.__ModuleLoader__.load({
 					restoring: "恢复中…",
 					restored: "已恢复",
 					restoreAndOpen: "已恢复并打开",
+					restoreAll: "恢复全部",
+					restoreAllDone: (n) => "已恢复 " + n + " 个会话",
+					openHint: "请在侧边栏点击打开",
 					openedFolder: "已打开文件夹",
 					close: "关闭",
 					justNow: "刚刚",
@@ -78,6 +81,9 @@ window.__ModuleLoader__.load({
 					restoring: "…",
 					restored: "Restored",
 					restoreAndOpen: "Restored & opened",
+					restoreAll: "Restore all",
+					restoreAllDone: (n) => "Restored " + n + " session(s)",
+					openHint: "open it from the sidebar",
 					openedFolder: "Folder opened",
 					close: "Close",
 					justNow: "just now",
@@ -185,6 +191,42 @@ window.__ModuleLoader__.load({
 					}
 				},
 				{
+					id: "dsh-archive-manager#archiveManager/unarchiveMany",
+					service: "archiveManager",
+					namespace: "archiveManager",
+					method: "unarchiveMany",
+					invocation: { kind: "direct" },
+					parameters: [
+						{
+							name: "request",
+							wire: "request",
+							source: "json",
+							codec: {
+								mode: "strict",
+								typeSymbol: "dsh-archive-manager/types#UnarchiveManyRequest",
+								schema: {
+									parse: (v) => {
+										if (!v || typeof v !== "object") throw new Error("request must be an object");
+										const arr = Array.isArray(v.sessionIds) ? v.sessionIds.map(str).filter((id) => id.length > 0) : [];
+										return { sessionIds: arr };
+									}
+								}
+							}
+						}
+					],
+					result: {
+						mode: "strict",
+						typeSymbol: "dsh-archive-manager/types#UnarchiveManyResult",
+						schema: {
+							parse: (v) => {
+								if (!v || typeof v !== "object") throw new Error("result must be an object");
+								const arr = Array.isArray(v.archivedSessionIds) ? v.archivedSessionIds.map(str) : [];
+								return { archivedSessionIds: arr, restored: typeof v.restored === "number" ? v.restored : 0 };
+							}
+						}
+					}
+				},
+				{
 					id: "dsh-archive-manager#archiveManager/openSessionFolder",
 					service: "archiveManager",
 					namespace: "archiveManager",
@@ -265,6 +307,12 @@ window.__ModuleLoader__.load({
 				flex: "none", width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center",
 				border: "none", background: "transparent", color: "var(--dsw-alias-label-tertiary, #8a919c)",
 				cursor: "pointer", borderRadius: 7, transition: "background .15s ease, color .15s ease"
+			},
+			headAction: {
+				flex: "none", display: "inline-flex", alignItems: "center", gap: 4, height: 26,
+				padding: "0 9px", borderRadius: 7, fontSize: 12, fontWeight: 500, cursor: "pointer",
+				border: "1px solid var(--dsw-alias-border-l2, #e4e7ec)", background: "transparent",
+				color: "var(--dsw-alias-label-secondary, #5f6672)", whiteSpace: "nowrap"
 			},
 			body: { flex: 1, overflowY: "auto", padding: "6px 8px 8px" },
 			toast: {
@@ -478,16 +526,57 @@ window.__ModuleLoader__.load({
 				setBusy(id);
 				setToast(null);
 				const ok = await runUnarchive(id);
-				if (ok && props.open) {
-					try {
-						props.open(id);
-					} catch (e) {
-						/* open failure shouldn't kill the panel */
+				if (ok) {
+					// DSH 0.2 removed `sessions.open`; the official UI opens a session
+					// from the sidebar, so degrade to a "restored, open it yourself"
+					// notice when no opener is wired.
+					const opener = props.open;
+					if (typeof opener === "function") {
+						try {
+							opener(id);
+							setToast({ kind: "ok", text: STR.restoreAndOpen + " " + shortId(id) });
+						} catch (e) {
+							setToast({ kind: "ok", text: STR.restored + ": " + shortId(id) + " · " + STR.openHint });
+						}
+					} else {
+						setToast({ kind: "ok", text: STR.restored + ": " + shortId(id) + " · " + STR.openHint });
 					}
-					setToast({ kind: "ok", text: STR.restoreAndOpen + " " + shortId(id) });
 				}
 				setBusy(null);
 			}, [busy, runUnarchive, props]);
+
+			const doRestoreAll = useCallback(async () => {
+				if (busy) return;
+				const ids = archivedIds.filter((id) => !removed.has(id));
+				if (ids.length === 0) return;
+				setBusy("__all__");
+				setToast(null);
+				if (!remote || typeof remote.unarchiveMany !== "function") {
+					// fall back to one-by-one when the bulk endpoint is unavailable
+					let done = 0;
+					for (const id of ids) if (await runUnarchive(id)) done += 1;
+					setToast(done > 0 ? { kind: "ok", text: STR.restoreAllDone(done) } : { kind: "err", text: STR.remoteDown });
+					setBusy(null);
+					return;
+				}
+				try {
+					const result = await remote.unarchiveMany({ sessionIds: ids });
+					if (result && result.ok) {
+						setRemoved((prev) => {
+							const next = new Set(prev);
+							for (const id of ids) next.add(id);
+							return next;
+						});
+						setToast({ kind: "ok", text: STR.restoreAllDone(result.value && result.value.restored ? result.value.restored : ids.length) });
+					} else {
+						setToast({ kind: "err", text: STR.error + ": " + (result && result.error ? result.error.message : "unknown") });
+					}
+				} catch (e) {
+					setToast({ kind: "err", text: STR.error + ": " + (e instanceof Error ? e.message : String(e)) });
+				} finally {
+					setBusy(null);
+				}
+			}, [busy, archivedIds, removed, remote, runUnarchive]);
 
 			const doOpenFolder = useCallback(async (id) => {
 				if (busy) return;
@@ -627,6 +716,21 @@ window.__ModuleLoader__.load({
 					React.createElement("span", { style: S.headIcon }, I.archive),
 					React.createElement("span", { style: S.headTitle }, STR.title),
 					React.createElement("span", { style: S.badge }, STR.count(total)),
+					total > 0
+						? React.createElement(
+								"button",
+								{
+									type: "button",
+									style: S.headAction,
+									disabled: busy === "__all__",
+									onPointerDown: (e) => e.stopPropagation(),
+									onClick: () => doRestoreAll(),
+									title: STR.restoreAll
+								},
+								I.restore,
+								React.createElement("span", null, busy === "__all__" ? "…" : STR.restoreAll)
+							)
+						: null,
 					React.createElement(
 						"button",
 						{ type: "button", style: S.closeBtn, onClick: () => setOpen(false), title: STR.close, "aria-label": STR.close },
@@ -710,7 +814,13 @@ window.__ModuleLoader__.load({
 			try {
 				workspacesStore = ctx.workspaces.list;
 				sessionsStore = ctx.sessions.list;
-				openSession = (id) => ctx.sessions.open(id);
+				// DSH 0.2.x removed `sessions.open` (the official UI opens a session
+				// from its own navigation actions), so only wire an opener when the
+				// host still exposes one; the panel degrades to a restore-only notice.
+				if (ctx.sessions && typeof ctx.sessions.open === "function") {
+					const sessions = ctx.sessions;
+					openSession = (id) => sessions.open(id);
+				}
 			} catch (e) {
 				console.warn("[dsh-archive-manager] store capture failed:", e);
 			}
