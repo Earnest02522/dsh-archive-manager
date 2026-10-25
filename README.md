@@ -15,13 +15,13 @@ or jump to the folder the conversation belongs to.
 >
 > - **A single archived overview** — one panel that lists *every* archived
 >   conversation, grouped by workspace, with per-group counts.
-> - **Bulk restore** — a *Restore all* button drains the archive in one go,
->   instead of unarchiving conversations one by one from the sidebar.
+> - **Bulk restore** — tick conversations (or *select all*) and restore the
+>   selection in one go, instead of unarchiving them one by one from the sidebar.
 > - **Search** — filter the archive by title, session id or working directory.
 > - **Restore & open** — restore a conversation and immediately reveal it in
 >   the main view.
-> - **Delete permanently** — remove an archived conversation from disk, after an
->   inline confirmation.
+> - **Delete, one or many** — remove archived conversations from disk, after an
+>   inline confirmation that happens *on the row* (or once for a batch).
 > - **Reveal the working directory** of an archived conversation.
 
 ## Features
@@ -37,19 +37,27 @@ or jump to the folder the conversation belongs to.
 - **Restore all** — restores every archived conversation (and every
   conversation matching the current search) sequentially, reporting partial
   failures instead of stopping.
+- **Multi-select** — every row carries a checkbox that appears on hover (always
+  visible on touch); a bulk bar then offers *Restore selected*, *Delete
+  selected* and *Clear*, and the header toggles *Select all* over the visible
+  rows. The selection is pruned against the live archive set, so a batch can
+  never act on a row that has already gone.
 - **Restore & open** — restores and then opens the conversation in the main
   view through the `uiWorkspace` service (skipped gracefully when that service
   is not available).
 - **Reveal working directory** — asks the host to reveal the session's `cwd`
   in the platform file manager (`session/openWorkspacePath { action: "reveal" }`).
-- **Delete permanently** — the only destructive action, behind an inline
-  `Delete?` confirmation. It asks the host to unlink the session's transcript,
-  drops the id from `archivedSessionIds`, detaches it from its workspace and
-  announces `api-session/removed`, so the sidebar forgets it without a restart.
+- **Delete permanently** — the only destructive action. Pressing the trash icon
+  turns *that row* into an inline `Delete? / Delete / Cancel` prompt, so the
+  panel neither reflows nor loses your place; a batch asks once for the whole
+  selection. Confirming asks the host to unlink the transcript, drops the id
+  from `archivedSessionIds`, detaches it from its workspace and announces
+  `api-session/removed`, so the sidebar forgets it without a restart.
   Conversations with running work are refused (`session-active`).
-- **Keyboard and pointer friendly** — `Esc` closes the panel, the header drags,
-  all eight edges/corners resize, the geometry is clamped to the viewport, and
-  row actions stay visible on touch devices.
+- **Opens and closes itself** — `Esc` closes the panel, a pointer press anywhere
+  outside closes it too (no manual ✕ needed), the header drags, all eight
+  edges/corners resize, the geometry is clamped to the viewport, and row actions
+  stay visible on touch devices.
 - **i18n** — Chinese and English UI text, picked from the DSH locale first and
   the browser language second.
 - **Client-side UI, one Host Remote** — the panel is plain ESM served straight
@@ -69,7 +77,7 @@ open, reveal — therefore talks to services DSH already provides.
 
 Deletion is the one thing DSH does **not** provide. There is no delete endpoint
 in `sessionController`, nothing writable in `workspace-files`, and the browser
-cannot touch `~/.dsh/sessions/...`. So v0.7.0 adds exactly one Host Remote:
+cannot touch `~/.dsh/sessions/...`. So v0.8.0 adds exactly one Host Remote:
 
 | Layer | What happens |
 |---|---|
@@ -189,9 +197,14 @@ patch template automatically.
 - The sidebar foot shows a **归档 / Archive** button next to Settings.
 - Click it: archived conversations appear under their workspace headings with
   search, row actions and a footer counter.
-- Hover a row: the trash icon offers **Delete**; it asks for an inline
-  confirmation and, once confirmed, reports `已删除 / Deleted`. Running
-  conversations are refused, and the row disappears on its own.
+- Hover a row: the trash icon offers **Delete**; the row itself turns into a
+  `Delete? / Delete / Cancel` prompt and, once confirmed, reports
+  `已删除 / Deleted`. Running conversations are refused, and the row disappears
+  on its own.
+- Tick a few checkboxes: the bulk bar appears above the footer with *Restore
+  selected* / *Delete selected*; deleting a batch asks once for the whole
+  selection.
+- Click anywhere outside the panel: it folds away, exactly like pressing `Esc`.
 - The host half is live when `archiveManager/deleteSession` answers; a missing
   host half only disables the trash icon (the rest still works).
 - With DSH's devtools open, the browser bundle
@@ -225,20 +238,21 @@ node test/client.test.mjs
 `node test/client.test.mjs` runs `test/client.test.mjs`, a dependency-free
 harness with a hand-written mini React runtime that stubs
 `window.__ModuleLoader__`, `document` and `navigator`, applies the plugin to a
-fake `ctx`, and asserts 111 behaviours: the load contract, slot registration
+fake `ctx`, and asserts 142 behaviours: the load contract, slot registration
 (`name` / `id` / `order` / `locale`), Chinese fallback translation, grouping
 (3 workspaces → 3 groups), search filtering, single restore (service call +
 toast + reactive row removal), restore-and-open, bulk restore, reveal request
-payload, the delete confirmation flow (nothing is deleted before you confirm,
-the descriptor carries the strict codecs the gateway requires, the mount is
-reused, the archive snapshot is re-synced afterwards), refused deletion while a
-conversation is running, degraded mode
-without `unarchiveSession` or without a remote gateway, empty-archive and
-narrow-sidebar rendering, drag/resize geometry math, `Esc` handling, plus
-static assertions over both halves (browser bundle: only `react` is required,
-no `$mount` on hand-written descriptors for the old endpoints, no `unlink`;
-host half: imports only `node:fs/promises` and the Typert protocol, unlinks a
-single file and never a directory tree).
+payload, the row-inline delete confirmation (the row keeps its place and the
+panel keeps its geometry, nothing is deleted before you confirm, the descriptor
+carries the strict codecs the gateway requires, the mount is reused, the archive
+snapshot is re-synced afterwards), multi-select restore and delete, *Select
+all*, click-away dismissal, refused deletion while a conversation is running,
+degraded mode without `unarchiveSession` or without a remote gateway,
+empty-archive and narrow-sidebar rendering, drag/resize geometry math, `Esc`
+handling, plus static assertions over both halves (browser bundle: only `react`
+is required, no `$mount` on hand-written descriptors for the old endpoints, no
+`unlink`; host half: imports only `node:fs/promises` and the Typert protocol,
+unlinks a single file and never a directory tree).
 
 The plugin's own sources are the only inputs; the harness never touches a DSH
 installation.
@@ -264,6 +278,12 @@ Deleting is **not** an archive operation — archive only hides a session id.
 4. **It cannot be undone.** There is no trash, no undo, and the built-in
    *Restore* action has nothing left to restore. If you only want a
    conversation out of the way, use *Archive* instead.
+
+Bulk delete runs the same single-session call in sequence: one row that is still
+running fails on its own and is reported as `Deleted N, M failed`, while the
+rest of the batch goes through. Nothing is ever deleted recursively — every
+request unlinks one resolved file path, which is why the static test suite also
+asserts the host half never imports `rmSync` and never passes `recursive: true`.
 
 Because the persistence seam deliberately exposes no delete interface, this is
 the one place where the plugin goes beyond DSH's own API surface — hence the

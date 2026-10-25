@@ -1,6 +1,6 @@
 {
   "name": "dsh-archive-manager",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Archived-conversation manager for DeepSeek Harness: a sidebar panel that lists archived conversations grouped by workspace, with single and bulk restore plus permanent delete. Adds one Host Remote for deletion and is otherwise a client-only UI plugin for DSH 0.2.x and newer.",
   "type": "module",
   "main": "src/index.js",

@@ -233,6 +233,7 @@ function byLabel(label) {
  * -------------------------------------------------------------------------- */
 
 const styleTags = [];
+const documentListeners = new Map();
 const documentStub = {
 	documentElement: { lang: "zh-CN" },
 	head: {
@@ -250,12 +251,31 @@ const documentStub = {
 			},
 		};
 	},
+	addEventListener(name, handler) {
+		const list = documentListeners.get(name) || [];
+		list.push(handler);
+		documentListeners.set(name, list);
+	},
+	removeEventListener(name, handler) {
+		const list = documentListeners.get(name) || [];
+		documentListeners.set(
+			name,
+			list.filter((entry) => entry !== handler),
+		);
+	},
 	querySelector(selector) {
 		const match = /data-plugin-css="([^"]+)"/.exec(selector);
 		if (!match) return null;
 		return styleTags.find((tag) => tag.attributes["data-plugin-css"] === match[1]) || null;
 	},
 };
+
+/** Deliver a pointer press the way a real outside click would. */
+function pressOutside(target) {
+	const handlers = (documentListeners.get("pointerdown") || []).slice();
+	for (const handler of handlers) handler({ target });
+	return handlers.length;
+}
 
 const listeners = new Map();
 const windowStub = {
@@ -529,7 +549,12 @@ async function main() {
 
 	const injectedProps = registration.options.inject();
 	check("hooks exposed", Boolean(injectedProps.hooks && injectedProps.hooks.useWorkspaces && injectedProps.hooks.useSessions));
-	check("callbacks exposed", ["restoreOne", "restoreMany", "openSession", "revealPath"].every((key) => typeof injectedProps[key] === "function"));
+	check(
+		"callbacks exposed",
+		["restoreOne", "restoreMany", "openSession", "revealPath", "deleteSession", "deleteMany"].every(
+			(key) => typeof injectedProps[key] === "function",
+		),
+	);
 	check("translator exposed", typeof injectedProps.t === "function");
 	equal("translator falls back to Chinese", injectedProps.t("trigger.label"), "归档");
 
@@ -774,6 +799,117 @@ async function main() {
 	activeView.dispose();
 	offlineView.dispose();
 	mountFailView.dispose();
+
+	console.log("\n# delete confirmation lives on the row");
+	const inlineHarness = makeContext();
+	exports.apply(inlineHarness.ctx);
+	const inlineRegistration = inlineHarness.registrations[0];
+	const inlineProps = inlineRegistration.options.inject();
+	const inlineView = mount(inlineRegistration.Component, () => propsFor(inlineRegistration, { wide: true }));
+	findAll(inlineView.tree, byClass("dsh-am-trigger"))[0].props.onClick();
+	const rowsBefore = findAll(inlineView.tree, byClass("dsh-am-row"));
+	const heightBefore = findAll(inlineView.tree, byClass("dsh-am-panel"))[0].props.style.height;
+	findAll(rowsBefore[0], byLabel(inlineProps.t("action.delete")))[0].props.onClick();
+	const rowsDuring = findAll(inlineView.tree, byClass("dsh-am-row"));
+	equal("row count unchanged by the confirmation", rowsDuring.length, rowsBefore.length);
+	const confirmNode = findAll(rowsDuring[0], byClass("dsh-am-confirm"))[0];
+	check("confirmation rendered inside the row itself", Boolean(confirmNode));
+	check("row is flagged as confirming", rowsDuring[0].props["data-confirm"] === "true");
+	check("confirmation replaces that row's actions", findAll(rowsDuring[0], byClass("dsh-am-row-actions")).length === 0);
+	check("other rows keep their actions", findAll(rowsDuring[1], byClass("dsh-am-row-actions")).length === 1);
+	equal("panel keeps its geometry", findAll(inlineView.tree, byClass("dsh-am-panel"))[0].props.style.height, heightBefore);
+	findAll(confirmNode, byClass("dsh-am-btn"))[1].props.onClick();
+	check("cancel restores the row", findAll(inlineView.tree, byClass("dsh-am-confirm")).length === 0);
+	inlineView.dispose();
+
+	console.log("\n# multi-select restore");
+	const selectHarness = makeContext();
+	exports.apply(selectHarness.ctx);
+	const selectRegistration = selectHarness.registrations[0];
+	const selectProps = selectRegistration.options.inject();
+	const selectView = mount(selectRegistration.Component, () => propsFor(selectRegistration, { wide: true }));
+	findAll(selectView.tree, byClass("dsh-am-trigger"))[0].props.onClick();
+	equal("a checkbox per row", findAll(selectView.tree, byClass("dsh-am-check")).length, 3);
+	check("no bulk bar before selecting", findAll(selectView.tree, byClass("dsh-am-bulk")).length === 0);
+	findAll(selectView.tree, byClass("dsh-am-check"))[0].props.onClick();
+	check("bulk bar appears", findAll(selectView.tree, byClass("dsh-am-bulk")).length === 1);
+	check(
+		"bulk bar counts the selection",
+		textOf(findAll(selectView.tree, byClass("dsh-am-bulk"))[0]).indexOf("已选 1 项") !== -1,
+		textOf(findAll(selectView.tree, byClass("dsh-am-bulk"))[0]),
+	);
+	findAll(selectView.tree, byClass("dsh-am-check"))[1].props.onClick();
+	equal(
+		"two rows marked selected",
+		findAll(selectView.tree, byClass("dsh-am-row")).filter((row) => row.props["data-selected"] === "true").length,
+		2,
+	);
+	const bulkRestore = findAll(selectView.tree, byLabel(selectProps.t("bulk.restore")))[0];
+	check("bulk restore button rendered", Boolean(bulkRestore));
+	await bulkRestore.props.onClick();
+	equal("bulk restore unarchived both", selectHarness.calls.unarchive.join(","), "s-alpha-1,s-beta-1");
+	check("bulk bar cleared after restoring", findAll(selectView.tree, byClass("dsh-am-bulk")).length === 0);
+	equal("only the ungrouped row left", findAll(selectView.tree, byClass("dsh-am-row")).length, 1);
+	selectView.dispose();
+
+	console.log("\n# multi-select delete");
+	const bulkDeleteHarness = makeContext();
+	exports.apply(bulkDeleteHarness.ctx);
+	const bulkDeleteRegistration = bulkDeleteHarness.registrations[0];
+	const bulkDeleteProps = bulkDeleteRegistration.options.inject();
+	const bulkDeleteView = mount(bulkDeleteRegistration.Component, () => propsFor(bulkDeleteRegistration, { wide: true }));
+	findAll(bulkDeleteView.tree, byClass("dsh-am-trigger"))[0].props.onClick();
+	findAll(bulkDeleteView.tree, byClass("dsh-am-check"))[0].props.onClick();
+	findAll(bulkDeleteView.tree, byClass("dsh-am-check"))[1].props.onClick();
+	findAll(bulkDeleteView.tree, byLabel(bulkDeleteProps.t("bulk.delete")))[0].props.onClick();
+	const bulkConfirmBar = findAll(bulkDeleteView.tree, byClass("dsh-am-bulk"))[0];
+	check("bulk delete asks once for the batch", textOf(bulkConfirmBar).indexOf("永久删除这 2 个归档会话") !== -1, textOf(bulkConfirmBar));
+	check("nothing deleted before confirming", bulkDeleteHarness.calls.deleted.length === 0);
+	await findAll(bulkConfirmBar, byClass("dsh-am-btn-danger"))[0].props.onClick();
+	equal("both sessions deleted", bulkDeleteHarness.calls.deleted.slice().sort().join(","), "s-alpha-1,s-beta-1");
+	check(
+		"bulk delete toast",
+		textOf(findAll(bulkDeleteView.tree, byClass("dsh-am-toast"))[0]).indexOf("已删除 2 个会话") !== -1,
+		textOf(findAll(bulkDeleteView.tree, byClass("dsh-am-toast"))[0]),
+	);
+	equal("rows removed after the batch", findAll(bulkDeleteView.tree, byClass("dsh-am-row")).length, 1);
+	check("selection cleared after the batch", findAll(bulkDeleteView.tree, byClass("dsh-am-bulk")).length === 0);
+	bulkDeleteView.dispose();
+
+	console.log("\n# select all");
+	const allHarness = makeContext();
+	exports.apply(allHarness.ctx);
+	const allRegistration = allHarness.registrations[0];
+	const allProps = allRegistration.options.inject();
+	const allView = mount(allRegistration.Component, () => propsFor(allRegistration, { wide: true }));
+	findAll(allView.tree, byClass("dsh-am-trigger"))[0].props.onClick();
+	const selectAll = findAll(allView.tree, byLabel(allProps.t("action.selectAll")))[0];
+	check("select-all toggle rendered", Boolean(selectAll));
+	selectAll.props.onClick();
+	equal(
+		"select all ticks every visible row",
+		findAll(allView.tree, byClass("dsh-am-row")).filter((row) => row.props["data-selected"] === "true").length,
+		3,
+	);
+	check("select all is pressed", findAll(allView.tree, byLabel(allProps.t("action.selectAll")))[0].props["aria-pressed"] === "true");
+	findAll(allView.tree, byLabel(allProps.t("action.selectAll")))[0].props.onClick();
+	check("select all toggles back off", findAll(allView.tree, byClass("dsh-am-bulk")).length === 0);
+	allView.dispose();
+
+	console.log("\n# click away collapses the panel");
+	const awayHarness = makeContext();
+	exports.apply(awayHarness.ctx);
+	const awayRegistration = awayHarness.registrations[0];
+	const awayView = mount(awayRegistration.Component, () => propsFor(awayRegistration, { wide: true }));
+	equal("no document listener while closed", (documentListeners.get("pointerdown") || []).length, 0);
+	findAll(awayView.tree, byClass("dsh-am-trigger"))[0].props.onClick();
+	check("document listener installed while open", (documentListeners.get("pointerdown") || []).length > 0);
+	pressOutside({ closest: () => ({}) });
+	check("a press on the panel itself keeps it open", findAll(awayView.tree, byClass("dsh-am-panel")).length === 1);
+	pressOutside({ closest: () => null });
+	equal("a press outside collapses the panel", findAll(awayView.tree, byClass("dsh-am-panel")).length, 0);
+	equal("listener removed after closing", (documentListeners.get("pointerdown") || []).length, 0);
+	awayView.dispose();
 
 	console.log("\n# bundle surface");
 	const source = readFileSync(new URL("../src/client.js", import.meta.url), "utf8");

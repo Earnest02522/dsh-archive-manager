@@ -53,10 +53,22 @@ window.__ModuleLoader__.load({
 			"action.reveal": "在文件管理器中显示工作目录",
 			"action.restoreAll": "全部恢复",
 			"action.delete": "删除归档会话",
+			"action.select": "选择该会话",
+			"action.selectAll": "全选",
+			"action.clearSelection": "清除选择",
 			"delete.confirm": "永久删除「{title}」？会话记录文件会被移除，无法撤销。",
+			"delete.confirmShort": "永久删除「{title}」？",
+			"delete.irreversible": "无法撤销",
 			"delete.confirmYes": "删除",
 			"delete.confirmNo": "取消",
+			"bulk.selected": "已选 {count} 项",
+			"bulk.hint": "可批量恢复或删除",
+			"bulk.restore": "恢复所选",
+			"bulk.delete": "删除所选",
+			"bulk.confirm": "永久删除这 {count} 个归档会话？",
 			"toast.deleted": "已删除「{title}」",
+			"toast.deletedMany": "已删除 {count} 个会话",
+			"toast.deletedPartial": "已删除 {done} 个，{failed} 个失败",
 			"toast.deleteFailed": "删除失败：{reason}",
 			"toast.deleteActive": "该会话仍在运行，请先停止再删除",
 			"toast.deleteUnavailable": "当前 DSH 版本没有提供删除会话的接口",
@@ -72,7 +84,7 @@ window.__ModuleLoader__.load({
 			"toast.revealFailed": "无法打开工作目录：{reason}",
 			"toast.openMissing": "已恢复，请从侧边栏打开会话",
 			"toast.unavailable": "当前 DSH 版本没有提供恢复归档的接口",
-			"progress.running": "正在恢复 {done}/{total}",
+			"progress.running": "正在处理 {done}/{total}",
 			"foot.hint": "共 {total} 个归档会话",
 			"foot.filtered": "{shown} / {total}",
 			"time.now": "刚刚",
@@ -93,10 +105,22 @@ window.__ModuleLoader__.load({
 			"action.reveal": "Reveal working folder",
 			"action.restoreAll": "Restore all",
 			"action.delete": "Delete archived conversation",
+			"action.select": "Select this conversation",
+			"action.selectAll": "Select all",
+			"action.clearSelection": "Clear selection",
 			"delete.confirm": "Permanently delete \"{title}\"? Its transcript file is removed and cannot be restored.",
+			"delete.confirmShort": "Permanently delete \"{title}\"?",
+			"delete.irreversible": "cannot be undone",
 			"delete.confirmYes": "Delete",
 			"delete.confirmNo": "Cancel",
+			"bulk.selected": "{count} selected",
+			"bulk.hint": "restore or delete together",
+			"bulk.restore": "Restore selected",
+			"bulk.delete": "Delete selected",
+			"bulk.confirm": "Permanently delete these {count} archived conversations?",
 			"toast.deleted": "Deleted \"{title}\"",
+			"toast.deletedMany": "Deleted {count} conversations",
+			"toast.deletedPartial": "Deleted {done}, {failed} failed",
 			"toast.deleteFailed": "Delete failed: {reason}",
 			"toast.deleteActive": "This conversation is still running — stop it before deleting",
 			"toast.deleteUnavailable": "This DSH version exposes no delete-session API",
@@ -112,7 +136,7 @@ window.__ModuleLoader__.load({
 			"toast.revealFailed": "Could not open the folder: {reason}",
 			"toast.openMissing": "Restored — open it from the sidebar",
 			"toast.unavailable": "This DSH version exposes no unarchive API",
-			"progress.running": "Restoring {done}/{total}",
+			"progress.running": "Working {done}/{total}",
 			"foot.hint": "{total} archived conversations",
 			"foot.filtered": "{shown} / {total}",
 			"time.now": "just now",
@@ -332,6 +356,8 @@ window.__ModuleLoader__.load({
 			search: "M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13z|M15.5 15.5 21 21",
 			close: "M6 6l12 12|M18 6 6 18",
 			checkAll: "M2.5 12.5l4 4 8-9|M12.5 15.5l1.5 1.5 8-9",
+			check: "M5 12.5l4.5 4.5L19 7",
+			select: "M4.5 4.5h15v15h-15z|M8.5 12.6l2.6 2.6 4.6-5.4",
 			trash: "M4 7h16|M9.5 7V4.5h5V7|M6.5 7l1 13h9l1-13|M10.5 11v5|M13.5 11v5",
 		};
 
@@ -362,7 +388,9 @@ window.__ModuleLoader__.load({
 		 * the app theme in both light and dark mode.                          *
 		 * ------------------------------------------------------------------ */
 		const CSS = `
+/* Sidebar entry ------------------------------------------------------- */
 .dsh-am-trigger {
+	position: relative;
 	display: inline-flex;
 	align-items: center;
 	gap: 6px;
@@ -392,20 +420,26 @@ window.__ModuleLoader__.load({
 	outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, #4c8dff);
 	outline-offset: 1px;
 }
+.dsh-am-trigger-icon { display: inline-flex; }
 .dsh-am-trigger-label { white-space: nowrap; }
 .dsh-am-badge {
-	min-width: 16px;
-	height: 16px;
-	padding: 0 4px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 17px;
+	height: 17px;
+	padding: 0 5px;
 	border-radius: 999px;
 	background: var(--dsw-alias-brand-primary, #4c6ef5);
 	color: #fff;
 	font-size: 10px;
 	font-weight: 600;
-	line-height: 16px;
+	line-height: 17px;
 	text-align: center;
 	font-variant-numeric: tabular-nums;
 }
+
+/* Panel --------------------------------------------------------------- */
 .dsh-am-panel {
 	position: fixed;
 	z-index: 1200;
@@ -413,25 +447,28 @@ window.__ModuleLoader__.load({
 	flex-direction: column;
 	overflow: hidden;
 	box-sizing: border-box;
-	border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.24));
-	border-radius: var(--dsw-radius-lg, 12px);
+	border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.22));
+	border-radius: var(--dsw-radius-panel, 14px);
 	background: var(--dsw-alias-bg-layer-2, #fff);
 	color: var(--dsw-alias-label-primary, #1f2430);
-	box-shadow: var(--dsw-shadow-lv3, 0 16px 40px rgba(0, 0, 0, 0.18));
+	box-shadow: var(--dsw-shadow-lv3, 0 18px 48px rgba(0, 0, 0, 0.24)), 0 1px 2px rgba(0, 0, 0, 0.06);
 	font-family: var(--dsw-font-family, inherit);
 	font-size: 13px;
-	animation: dsh-am-pop 140ms ease-out;
+	animation: dsh-am-pop 150ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 @keyframes dsh-am-pop {
-	from { opacity: 0; transform: translateY(4px) scale(0.99); }
-	to { opacity: 1; transform: translateY(0) scale(1); }
+	from { opacity: 0; transform: translateY(6px) scale(0.985); }
+	to { opacity: 1; transform: none; }
 }
+
+/* Header -------------------------------------------------------------- */
 .dsh-am-head {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	padding: 10px 8px 10px 12px;
-	border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(127, 127, 127, 0.16));
+	padding: 9px 8px 9px 12px;
+	border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(127, 127, 127, 0.14));
+	background: linear-gradient(180deg, rgba(127, 127, 127, 0.07), rgba(127, 127, 127, 0));
 	cursor: grab;
 	user-select: none;
 	touch-action: none;
@@ -441,13 +478,14 @@ window.__ModuleLoader__.load({
 .dsh-am-head-title {
 	font-size: 13px;
 	font-weight: 600;
+	letter-spacing: 0.01em;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 .dsh-am-head-count {
 	min-width: 18px;
-	padding: 1px 5px;
+	padding: 1px 6px;
 	border-radius: 999px;
 	background: var(--dsw-alias-bg-layer-4, rgba(127, 127, 127, 0.16));
 	color: var(--dsw-alias-label-secondary, #5b6270);
@@ -456,10 +494,13 @@ window.__ModuleLoader__.load({
 	font-variant-numeric: tabular-nums;
 }
 .dsh-am-spacer { flex: 1 1 auto; }
+
+/* Controls ------------------------------------------------------------ */
 .dsh-am-icon-btn {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
+	flex: none;
 	width: 26px;
 	height: 26px;
 	padding: 0;
@@ -468,25 +509,41 @@ window.__ModuleLoader__.load({
 	background: transparent;
 	color: var(--dsw-alias-label-secondary, #5b6270);
 	cursor: pointer;
+	transition: background-color 120ms ease, color 120ms ease;
 }
 .dsh-am-icon-btn:hover:not(:disabled) {
 	background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.14));
 	color: var(--dsw-alias-label-primary, #1f2430);
 }
-.dsh-am-icon-btn:disabled { opacity: 0.4; cursor: default; }
+.dsh-am-icon-btn:focus-visible {
+	outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, #4c8dff);
+	outline-offset: 1px;
+}
+.dsh-am-icon-btn:disabled { opacity: 0.35; cursor: default; }
+.dsh-am-icon-btn.dsh-am-danger:hover:not(:disabled),
+.dsh-am-icon-btn.dsh-am-danger:focus-visible {
+	color: var(--dsw-alias-label-error, #c0392b);
+	background: var(--dsw-alias-interactive-bg-hover-danger, rgba(192, 57, 43, 0.12));
+}
+
 .dsh-am-toolbar {
-	padding: 8px 12px;
-	border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(127, 127, 127, 0.16));
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 8px 10px;
+	border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(127, 127, 127, 0.14));
 }
 .dsh-am-search {
 	display: flex;
 	align-items: center;
+	flex: 1 1 auto;
 	gap: 6px;
-	height: 28px;
+	height: 30px;
 	padding: 0 8px;
 	border-radius: var(--dsw-radius-md, 8px);
 	background: var(--dsw-alias-bg-layer-1, rgba(127, 127, 127, 0.08));
 	color: var(--dsw-alias-label-tertiary, #7b8290);
+	transition: box-shadow 120ms ease;
 }
 .dsh-am-search:focus-within {
 	box-shadow: inset 0 0 0 1px var(--dsw-focus-ring-color, #4c8dff);
@@ -516,49 +573,113 @@ window.__ModuleLoader__.load({
 	cursor: pointer;
 }
 .dsh-am-clear:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.18)); }
+
+/* Body ---------------------------------------------------------------- */
 .dsh-am-body {
 	flex: 1 1 auto;
 	min-height: 0;
 	overflow-y: auto;
 	overscroll-behavior: contain;
-	padding: 6px 0 8px;
+	padding: 2px 6px 8px;
+	scrollbar-width: thin;
+	scrollbar-color: var(--dsw-alias-border-l3, rgba(127, 127, 127, 0.4)) transparent;
 }
-.dsh-am-group { padding: 4px 0; }
+.dsh-am-body::-webkit-scrollbar { width: 8px; }
+.dsh-am-body::-webkit-scrollbar-track { background: transparent; }
+.dsh-am-body::-webkit-scrollbar-thumb {
+	border: 2px solid transparent;
+	border-radius: 999px;
+	background-clip: content-box;
+	background-color: var(--dsw-alias-border-l3, rgba(127, 127, 127, 0.35));
+}
+.dsh-am-group { padding: 2px 0 4px; }
 .dsh-am-group-head {
+	position: sticky;
+	top: 0;
+	z-index: 1;
 	display: flex;
 	align-items: center;
 	gap: 6px;
-	padding: 4px 12px 2px;
-	position: sticky;
-	top: -6px;
+	padding: 8px 6px 4px;
 	background: var(--dsw-alias-bg-layer-2, #fff);
 }
 .dsh-am-group-title {
 	flex: 1 1 auto;
-	font-size: 11px;
+	min-width: 0;
+	font-size: 10.5px;
 	font-weight: 600;
-	letter-spacing: 0.02em;
+	letter-spacing: 0.07em;
+	text-transform: uppercase;
 	color: var(--dsw-alias-label-tertiary, #7b8290);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
 .dsh-am-group-count {
-	font-size: 11px;
+	flex: none;
+	min-width: 16px;
+	padding: 0 5px;
+	border-radius: 999px;
+	background: var(--dsw-alias-bg-layer-3, rgba(127, 127, 127, 0.1));
 	color: var(--dsw-alias-label-caption, #9aa1ad);
+	font-size: 10.5px;
+	line-height: 16px;
+	text-align: center;
 	font-variant-numeric: tabular-nums;
 }
+
+/* Rows ---------------------------------------------------------------- */
 .dsh-am-row {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	padding: 6px 12px 6px 14px;
+	min-height: 44px;
+	padding: 5px 6px 5px 4px;
+	border-radius: var(--dsw-radius-md, 8px);
 	position: relative;
+	transition: background-color 120ms ease, box-shadow 120ms ease;
 }
 .dsh-am-row:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.1)); }
-.dsh-am-row[data-busy="true"] { opacity: 0.6; }
+.dsh-am-row[data-selected="true"] {
+	background: rgba(76, 110, 245, 0.1);
+	box-shadow: inset 2px 0 0 var(--dsw-alias-brand-primary, #4c6ef5);
+}
+.dsh-am-row[data-busy="true"] { opacity: 0.55; }
+.dsh-am-check {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	border: 1.5px solid var(--dsw-alias-border-l3, rgba(127, 127, 127, 0.45));
+	border-radius: 5px;
+	background: transparent;
+	color: transparent;
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+.dsh-am-row:hover .dsh-am-check,
+.dsh-am-row:focus-within .dsh-am-check,
+.dsh-am-row[data-selected="true"] .dsh-am-check,
+.dsh-am-check:focus-visible { opacity: 1; }
+.dsh-am-check[aria-checked="true"] {
+	border-color: transparent;
+	background: var(--dsw-alias-brand-primary, #4c6ef5);
+	color: #fff;
+}
+.dsh-am-check:focus-visible {
+	outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, #4c8dff);
+	outline-offset: 1px;
+}
+@media (hover: none) { .dsh-am-check { opacity: 1; } }
 .dsh-am-row-main { flex: 1 1 auto; min-width: 0; }
 .dsh-am-row-title {
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 1.35;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -568,7 +689,7 @@ window.__ModuleLoader__.load({
 	display: flex;
 	align-items: center;
 	gap: 5px;
-	margin-top: 2px;
+	margin-top: 1px;
 	font-size: 11px;
 	color: var(--dsw-alias-label-tertiary, #7b8290);
 	white-space: nowrap;
@@ -577,95 +698,190 @@ window.__ModuleLoader__.load({
 .dsh-am-row-cwd {
 	overflow: hidden;
 	text-overflow: ellipsis;
-	max-width: 150px;
+	max-width: 140px;
 }
 .dsh-am-mono { font-family: var(--dsw-font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace); }
-.dsh-am-dot { opacity: 0.5; }
+.dsh-am-dot { opacity: 0.45; }
 .dsh-am-row-actions {
 	display: flex;
 	align-items: center;
-	gap: 2px;
+	gap: 1px;
 	opacity: 0;
-	transition: opacity 120ms ease;
+	transform: translateX(2px);
+	transition: opacity 120ms ease, transform 120ms ease;
 }
 .dsh-am-row:hover .dsh-am-row-actions,
-.dsh-am-row:focus-within .dsh-am-row-actions { opacity: 1; }
-@media (hover: none) { .dsh-am-row-actions { opacity: 1; } }
-.dsh-am-row[data-confirm="true"] { flex-wrap: wrap; }
-.dsh-am-row[data-confirm="true"] .dsh-am-row-actions { display: none; }
-.dsh-am-icon-btn.dsh-am-danger:hover,
-.dsh-am-icon-btn.dsh-am-danger:focus-visible {
-	color: var(--dsw-alias-label-error, #c0392b);
-	background: var(--dsw-alias-interactive-bg-hover-danger, rgba(192, 57, 43, 0.12));
+.dsh-am-row:focus-within .dsh-am-row-actions,
+.dsh-am-row[data-selected="true"] .dsh-am-row-actions { opacity: 1; transform: none; }
+@media (hover: none) { .dsh-am-row-actions { opacity: 1; transform: none; } }
+
+/* Inline delete confirmation, on the row itself ----------------------- */
+.dsh-am-row[data-confirm="true"] {
+	background: var(--dsw-alias-interactive-bg-hover-danger, rgba(192, 57, 43, 0.1));
+	box-shadow: inset 2px 0 0 var(--dsw-alias-label-error, #c0392b);
 }
 .dsh-am-confirm {
-	flex: 1 0 100%;
 	display: flex;
 	align-items: center;
-	gap: 8px;
-	margin-top: 6px;
-	padding: 6px 8px;
-	border-radius: var(--dsw-radius-sm, 6px);
-	background: var(--dsw-alias-bg-layer-3, rgba(127, 127, 127, 0.08));
-	font-size: 11px;
-	line-height: 1.5;
-	color: var(--dsw-alias-label-secondary, #5b6270);
+	gap: 6px;
+	flex: 1 1 auto;
+	min-width: 0;
+	animation: dsh-am-confirm-in 120ms ease-out;
 }
-.dsh-am-confirm-text { flex: 1; min-width: 0; }
-.dsh-am-btn {
+@keyframes dsh-am-confirm-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+.dsh-am-confirm-icon {
+	display: inline-flex;
 	flex: none;
-	padding: 3px 9px;
+	color: var(--dsw-alias-label-error, #c0392b);
+}
+.dsh-am-confirm-text {
+	flex: 1 1 auto;
+	min-width: 0;
+	font-size: 12px;
+	line-height: 1.4;
+	color: var(--dsw-alias-label-secondary, #5b6270);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Buttons ------------------------------------------------------------- */
+.dsh-am-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 4px;
+	flex: none;
+	height: 24px;
+	padding: 0 9px;
 	border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.28));
 	border-radius: var(--dsw-radius-sm, 6px);
 	background: var(--dsw-alias-bg-layer-1, rgba(127, 127, 127, 0.06));
 	color: var(--dsw-alias-label-primary, #1f2430);
 	font: inherit;
-	font-size: 11px;
+	font-size: 11.5px;
+	line-height: 1;
+	white-space: nowrap;
 	cursor: pointer;
+	transition: background-color 120ms ease, border-color 120ms ease;
 }
-.dsh-am-btn:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.12)); }
+.dsh-am-btn:hover:not(:disabled) {
+	background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.12));
+}
+.dsh-am-btn:disabled { opacity: 0.45; cursor: default; }
+.dsh-am-btn-label { white-space: nowrap; }
+.dsh-am-btn:focus-visible {
+	outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, #4c8dff);
+	outline-offset: 1px;
+}
 .dsh-am-btn-danger {
-	border-color: rgba(192, 57, 43, 0.55);
-	background: #c0392b;
+	border-color: transparent;
+	background: var(--dsw-alias-label-error, #c0392b);
 	color: #fff;
 }
-.dsh-am-btn-danger:hover { background: #a93226; }
+.dsh-am-btn-danger:hover:not(:disabled) { background: #a93226; }
+.dsh-am-btn-ghost {
+	border-color: transparent;
+	background: transparent;
+	color: var(--dsw-alias-label-secondary, #5b6270);
+}
+.dsh-am-btn-ghost:hover:not(:disabled) {
+	background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.12));
+	color: var(--dsw-alias-label-primary, #1f2430);
+}
+
+/* Bulk selection bar -------------------------------------------------- */
+.dsh-am-bulk {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 7px 10px;
+	border-top: 1px solid var(--dsw-alias-border-l1, rgba(127, 127, 127, 0.14));
+	background: var(--dsw-alias-bg-layer-3, rgba(127, 127, 127, 0.07));
+	animation: dsh-am-rise 140ms ease-out;
+}
+@keyframes dsh-am-rise {
+	from { opacity: 0; transform: translateY(5px); }
+	to { opacity: 1; transform: none; }
+}
+.dsh-am-bulk-count {
+	flex: none;
+	font-size: 11.5px;
+	font-weight: 600;
+	color: var(--dsw-alias-label-secondary, #5b6270);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+.dsh-am-bulk-hint {
+	flex: 1 1 auto;
+	min-width: 0;
+	font-size: 11.5px;
+	color: var(--dsw-alias-label-tertiary, #7b8290);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.dsh-am-bulk-actions {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex: none;
+}
+
+/* Empty state --------------------------------------------------------- */
 .dsh-am-empty {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: 6px;
+	gap: 4px;
 	height: 100%;
-	min-height: 160px;
-	padding: 24px 28px;
+	min-height: 168px;
+	padding: 26px 26px 30px;
 	text-align: center;
 }
+.dsh-am-empty-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 40px;
+	height: 40px;
+	margin-bottom: 4px;
+	border-radius: 12px;
+	background: var(--dsw-alias-bg-layer-3, rgba(127, 127, 127, 0.1));
+	color: var(--dsw-alias-label-tertiary, #7b8290);
+}
 .dsh-am-empty-title { font-size: 13px; font-weight: 600; color: var(--dsw-alias-label-secondary, #5b6270); }
-.dsh-am-empty-hint { font-size: 12px; line-height: 1.6; color: var(--dsw-alias-label-tertiary, #7b8290); }
+.dsh-am-empty-hint { max-width: 240px; font-size: 12px; line-height: 1.6; color: var(--dsw-alias-label-tertiary, #7b8290); }
+
+/* Footer + toast ------------------------------------------------------ */
 .dsh-am-foot {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	padding: 6px 12px;
-	border-top: 1px solid var(--dsw-alias-border-l1, rgba(127, 127, 127, 0.16));
+	padding: 6px 12px 7px;
+	border-top: 1px solid var(--dsw-alias-border-l1, rgba(127, 127, 127, 0.14));
 	font-size: 11px;
 	color: var(--dsw-alias-label-tertiary, #7b8290);
 }
 .dsh-am-foot > span:last-child { margin-left: auto; font-variant-numeric: tabular-nums; }
+.dsh-am-foot-spinner { display: inline-flex; align-items: center; gap: 6px; }
 .dsh-am-toast {
 	position: absolute;
-	left: 12px;
-	right: 12px;
-	bottom: 34px;
-	padding: 7px 10px;
+	left: 10px;
+	right: 10px;
+	bottom: 40px;
+	padding: 8px 11px;
 	border-radius: var(--dsw-radius-md, 8px);
-	background: var(--dsw-alias-toast-bg, rgba(28, 32, 40, 0.92));
+	background: var(--dsw-alias-toast-bg, rgba(28, 32, 40, 0.94));
 	color: #fff;
 	font-size: 12px;
-	line-height: 1.5;
-	box-shadow: var(--dsw-shadow-lv3, 0 8px 24px rgba(0, 0, 0, 0.2));
-	animation: dsh-am-pop 140ms ease-out;
+	line-height: 1.45;
+	box-shadow: var(--dsw-shadow-lv3, 0 10px 26px rgba(0, 0, 0, 0.24));
+	animation: dsh-am-rise 140ms ease-out;
 }
 .dsh-am-toast[data-kind="error"] { background: var(--dsw-alias-state-error-bg, #c0392b); }
 .dsh-am-spinner {
@@ -678,16 +894,17 @@ window.__ModuleLoader__.load({
 	animation: dsh-am-spin 700ms linear infinite;
 }
 @keyframes dsh-am-spin { to { transform: rotate(360deg); } }
-.dsh-am-rz { position: absolute; touch-action: none; }
-.dsh-am-rz-n { top: -3px; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
-.dsh-am-rz-s { bottom: -3px; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
-.dsh-am-rz-e { right: -3px; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
-.dsh-am-rz-w { left: -3px; top: 8px; bottom: 8px; width: 6px; cursor: ew-resize; }
+
+/* Resize handles ------------------------------------------------------ */
+.dsh-am-rz { position: absolute; touch-action: none; z-index: 2; }
+.dsh-am-rz-n { top: -3px; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+.dsh-am-rz-s { bottom: -3px; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+.dsh-am-rz-e { right: -3px; top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+.dsh-am-rz-w { left: -3px; top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
 .dsh-am-rz-nw { left: -3px; top: -3px; width: 12px; height: 12px; cursor: nwse-resize; }
 .dsh-am-rz-ne { right: -3px; top: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
 .dsh-am-rz-sw { left: -3px; bottom: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
-.dsh-am-rz-se { right: -3px; bottom: -3px; width: 12px; height: 12px; cursor: nwse-resize; }
-`;
+.dsh-am-rz-se { right: -3px; bottom: -3px; width: 12px; height: 12px; cursor: nwse-resize; }`;
 
 		/** Inject the panel stylesheet once per document. */
 		function installStyles() {
@@ -858,9 +1075,13 @@ window.__ModuleLoader__.load({
 			const [progress, setProgress] = react.useState(null);
 			const [toast, setToast] = react.useState(null);
 			const [confirming, setConfirming] = react.useState(null);
+			const [selected, setSelected] = react.useState(null);
+			const [bulkConfirm, setBulkConfirm] = react.useState(false);
 			const dragRef = react.useRef(null);
 			const queryRef = react.useRef(null);
 			const toastSeq = react.useRef(0);
+			const panelRef = react.useRef(null);
+			const triggerRef = react.useRef(null);
 
 			const items = workspacesState && Array.isArray(workspacesState.items) ? workspacesState.items : [];
 			const archivedIds = workspacesState && Array.isArray(workspacesState.archivedSessionIds) ? workspacesState.archivedSessionIds : [];
@@ -883,6 +1104,31 @@ window.__ModuleLoader__.load({
 				setToast({ kind, text, seq: toastSeq.current });
 			}, []);
 
+			/*
+			 * Selection state.
+			 *
+			 * `selected` is a plain id map (cheap to copy, no Set polyfill needed).
+			 * Every render filters it through the live archive set, so an id that
+			 * was restored or deleted elsewhere silently drops out instead of
+			 * letting a bulk action hit a stale row.
+			 */
+			const archivedSet = new Set(archivedIds.map((id) => String(id)));
+			const selectedIds = selected ? Object.keys(selected).filter((id) => selected[id] && archivedSet.has(id)) : [];
+			const selectedCount = selectedIds.length;
+			const visibleIds = [];
+			for (const group of visibleGroups) {
+				for (const row of group.rows) visibleIds.push(row.id);
+			}
+			const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.indexOf(id) !== -1);
+
+			/** Close everything transient, so reopening the panel starts clean. */
+			const closePanel = () => {
+				setOpen(false);
+				setConfirming(null);
+				setBulkConfirm(false);
+				setSelected(null);
+			};
+
 			react.useEffect(() => {
 				if (!toast) return undefined;
 				const timer = window.setTimeout(() => setToast(null), toast.kind === "error" ? 6000 : 2600);
@@ -895,11 +1141,32 @@ window.__ModuleLoader__.load({
 					if (event.key === "Escape") {
 						event.preventDefault();
 						event.stopPropagation();
-						setOpen(false);
+						closePanel();
 					}
 				};
 				window.addEventListener("keydown", onKeyDown, true);
 				return () => window.removeEventListener("keydown", onKeyDown, true);
+			}, [open]);
+
+			/*
+			 * Click-away dismissal: any pointer press outside the panel (and outside
+			 * the sidebar trigger) folds the panel, so the archive UI never lingers
+			 * over the conversation the user just switched to. Capture phase runs
+			 * before the click handler of whatever was pressed, which keeps the
+			 * very first outside press from also activating a control behind it.
+			 */
+			react.useEffect(() => {
+				if (!open) return undefined;
+				const onPointerDown = (event) => {
+					const target = event && event.target;
+					const panel = panelRef.current;
+					if (panel && typeof panel.contains === "function" && target && panel.contains(target)) return;
+					if (target && typeof target.closest === "function" && target.closest("[data-dsh-am]")) return;
+					closePanel();
+				};
+				if (typeof document === "undefined" || !document || typeof document.addEventListener !== "function") return undefined;
+				document.addEventListener("pointerdown", onPointerDown, true);
+				return () => document.removeEventListener("pointerdown", onPointerDown, true);
 			}, [open]);
 
 			react.useEffect(() => {
@@ -911,6 +1178,96 @@ window.__ModuleLoader__.load({
 				}
 				return undefined;
 			}, [open]);
+
+			/** Tick or untick one row. */
+			const toggleSelect = (id) => {
+				setSelected((current) => {
+					const next = Object.assign({}, current || {});
+					if (next[id]) delete next[id];
+					else next[id] = true;
+					return Object.keys(next).length ? next : null;
+				});
+				setBulkConfirm(false);
+			};
+
+			/** Tick every visible row, or clear the visible ones when already ticked. */
+			const toggleSelectAll = () => {
+				if (!visibleIds.length) return;
+				setSelected((current) => {
+					const next = Object.assign({}, current || {});
+					if (visibleIds.every((id) => next[id])) visibleIds.forEach((id) => delete next[id]);
+					else visibleIds.forEach((id) => { next[id] = true; });
+					return Object.keys(next).length ? next : null;
+				});
+				setBulkConfirm(false);
+			};
+
+			/** Drop the whole selection. */
+			const clearSelection = () => {
+				setSelected(null);
+				setBulkConfirm(false);
+			};
+
+			/** Restore every ticked conversation, with the same progress reporting. */
+			const restoreSelected = async () => {
+				if (!selectedIds.length) return;
+				if (typeof props.restoreMany !== "function") {
+					notify("error", t("toast.unavailable"));
+					return;
+				}
+				const ids = selectedIds.slice();
+				setProgress({ done: 0, total: ids.length });
+				try {
+					await props.restoreMany(ids, (done, totalCount) => setProgress({ done, total: totalCount }));
+					notify("ok", t("toast.restoredMany", { count: ids.length }));
+					clearSelection();
+				} catch (error) {
+					const failures = error && Array.isArray(error.failures) ? error.failures : null;
+					if (failures && failures.length) {
+						const done = ids.length - failures.length;
+						notify(
+							failures.length === ids.length ? "error" : "ok",
+							t("toast.partial", { done, failed: failures.length }) + " — " + reasonOf(failures[0].error),
+						);
+						clearSelection();
+					} else {
+						notify("error", t("toast.restoreFailed", { reason: reasonOf(error) }));
+					}
+				} finally {
+					setProgress(null);
+				}
+			};
+
+			/** Delete every ticked conversation, reporting partial failures. */
+			const deleteSelected = async () => {
+				if (!selectedIds.length) return;
+				if (typeof props.deleteMany !== "function") {
+					notify("error", t("toast.deleteUnavailable"));
+					return;
+				}
+				const ids = selectedIds.slice();
+				setBulkConfirm(false);
+				setProgress({ done: 0, total: ids.length });
+				try {
+					await props.deleteMany(ids, (done, totalCount) => setProgress({ done, total: totalCount }));
+					notify("ok", t("toast.deletedMany", { count: ids.length }));
+					clearSelection();
+				} catch (error) {
+					const failures = error && Array.isArray(error.failures) ? error.failures : null;
+					if (failures && failures.length) {
+						const done = ids.length - failures.length;
+						notify(
+							failures.length === ids.length ? "error" : "ok",
+							t("toast.deletedPartial", { done, failed: failures.length }) + " — " + reasonOf(failures[0].error),
+						);
+						clearSelection();
+					} else {
+						notify("error", t("toast.deleteFailed", { reason: reasonOf(error) }));
+					}
+				} finally {
+					setProgress(null);
+				}
+			};
 
 			const busy = (id) => Boolean(pending && pending[id]);
 
@@ -996,6 +1353,12 @@ window.__ModuleLoader__.load({
 				try {
 					await props.deleteSession(row.id);
 					notify("ok", t("toast.deleted", { title: ellipsis(row.title) }));
+					setSelected((current) => {
+						if (!current || !current[row.id]) return current;
+						const next = Object.assign({}, current);
+						delete next[row.id];
+						return Object.keys(next).length ? next : null;
+					});
 				} catch (error) {
 					const code = error && error.code ? String(error.code) : "";
 					notify(
@@ -1085,25 +1448,29 @@ window.__ModuleLoader__.load({
 
 			const toggle = () => {
 				if (open) {
-					setOpen(false);
+					closePanel();
 					return;
 				}
 				if (!geometry) setGeometry(clampGeometry(initialGeometry()));
 				setOpen(true);
+				setSelected(null);
+				setConfirming(null);
 			};
 
 			const trigger = h(
 				"button",
 				{
+					ref: triggerRef,
 					type: "button",
 					className: "dsh-am-trigger",
 					title: t("trigger.title"),
 					"aria-label": t("trigger.title"),
 					"aria-haspopup": "dialog",
 					"aria-expanded": open ? "true" : "false",
+					"data-dsh-am": "trigger",
 					onClick: toggle,
 				},
-				h(Icon, { name: "archive" }),
+				h("span", { className: "dsh-am-trigger-icon" }, h(Icon, { name: "archive" })),
 				props.wide === false ? null : h("span", { className: "dsh-am-trigger-label" }, t("trigger.label")),
 				total > 0 ? h("span", { className: "dsh-am-badge" }, total > 99 ? "99+" : String(total)) : null,
 			);
@@ -1136,6 +1503,19 @@ window.__ModuleLoader__.load({
 					{
 						type: "button",
 						className: "dsh-am-icon-btn",
+						title: t("action.selectAll"),
+						"aria-label": t("action.selectAll"),
+						"aria-pressed": allVisibleSelected ? "true" : "false",
+						disabled: shown === 0 || progress !== null,
+						onClick: toggleSelectAll,
+					},
+					h(Icon, { name: "select" }),
+				),
+				h(
+					"button",
+					{
+						type: "button",
+						className: "dsh-am-icon-btn",
 						title: t("action.restoreAll"),
 						"aria-label": t("action.restoreAll"),
 						disabled: shown === 0 || progress !== null,
@@ -1150,7 +1530,7 @@ window.__ModuleLoader__.load({
 						className: "dsh-am-icon-btn",
 						title: t("panel.close"),
 						"aria-label": t("panel.close"),
-						onClick: () => setOpen(false),
+						onClick: closePanel,
 					},
 					h(Icon, { name: "close" }),
 				),
@@ -1194,6 +1574,7 @@ window.__ModuleLoader__.load({
 				body = h(
 					"div",
 					{ className: "dsh-am-empty" },
+					h("span", { className: "dsh-am-empty-icon" }, h(Icon, { name: "archive", size: 20 })),
 					h("div", { className: "dsh-am-empty-title" }, t("empty.title")),
 					h("div", { className: "dsh-am-empty-hint" }, t("empty.hint")),
 				);
@@ -1201,6 +1582,7 @@ window.__ModuleLoader__.load({
 				body = h(
 					"div",
 					{ className: "dsh-am-empty" },
+					h("span", { className: "dsh-am-empty-icon" }, h(Icon, { name: "search", size: 20 })),
 					h("div", { className: "dsh-am-empty-title" }, t("empty.noMatch")),
 					h("div", { className: "dsh-am-empty-hint" }, t("search.placeholder")),
 				);
@@ -1218,14 +1600,68 @@ window.__ModuleLoader__.load({
 						group.rows.map((row) => {
 							const isBusy = busy(row.id);
 							const isConfirming = confirming === row.id;
+							const isSelected = selectedIds.indexOf(row.id) !== -1;
+							if (isConfirming) {
+								/*
+								 * The confirmation takes over the row instead of opening a
+								 * strip underneath it: the panel height stays put, the eye
+								 * does not have to travel, and there is no second target to
+								 * hit. Same height as a normal row (44px).
+								 */
+								return h(
+									"div",
+									{
+										className: "dsh-am-row",
+										key: row.id,
+										"data-confirm": "true",
+									},
+									h(
+										"div",
+										{ className: "dsh-am-confirm" },
+										h("span", { className: "dsh-am-confirm-icon" }, h(Icon, { name: "trash", size: 14 })),
+										h("span", { className: "dsh-am-confirm-text", title: row.title }, t("delete.confirmShort", { title: ellipsis(row.title, 40) })),
+										h(
+											"button",
+											{
+												type: "button",
+												className: "dsh-am-btn dsh-am-btn-danger",
+												onClick: () => deleteRow(row),
+											},
+											t("delete.confirmYes"),
+										),
+										h(
+											"button",
+											{
+												type: "button",
+												className: "dsh-am-btn dsh-am-btn-ghost",
+												onClick: () => setConfirming(null),
+											},
+											t("delete.confirmNo"),
+										),
+									),
+								);
+							}
 							return h(
 								"div",
 								{
 									className: "dsh-am-row",
 									key: row.id,
 									"data-busy": isBusy ? "true" : undefined,
-									"data-confirm": isConfirming ? "true" : undefined,
+									"data-selected": isSelected ? "true" : undefined,
 								},
+								h(
+									"button",
+									{
+										type: "button",
+										className: "dsh-am-check",
+										role: "checkbox",
+										"aria-checked": isSelected ? "true" : "false",
+										"aria-label": t("action.select"),
+										disabled: isBusy || progress !== null,
+										onClick: () => toggleSelect(row.id),
+									},
+									isSelected ? h(Icon, { name: "check", size: 11 }) : null,
+								),
 								h(
 									"div",
 									{ className: "dsh-am-row-main" },
@@ -1295,21 +1731,37 @@ window.__ModuleLoader__.load({
 										h(Icon, { name: "trash", size: 14 }),
 									),
 								),
-								isConfirming
-									? h(
+							);
+						}),
+					),
+				);
+			}
+
+			/*
+			 * Bulk bar. Appears between the list and the footer as soon as at least
+			 * one row is ticked, so the actions sit right under the selection the
+			 * user just made. Deleting asks once for the whole batch, in place.
+			 */
+			const bulkBar =
+				selectedCount > 0
+					? h(
+							"div",
+							{ className: "dsh-am-bulk" },
+							bulkConfirm
+								? h(
+										react.Fragment,
+										null,
+										h("span", { className: "dsh-am-bulk-count" }, t("bulk.confirm", { count: selectedCount })),
+										h("span", { className: "dsh-am-bulk-hint" }, t("delete.irreversible")),
+										h(
 											"div",
-											{ className: "dsh-am-confirm" },
-											h(
-												"span",
-												{ className: "dsh-am-confirm-text" },
-												t("delete.confirm", { title: ellipsis(row.title) }),
-											),
+											{ className: "dsh-am-bulk-actions" },
 											h(
 												"button",
 												{
 													type: "button",
 													className: "dsh-am-btn dsh-am-btn-danger",
-													onClick: () => deleteRow(row),
+													onClick: () => deleteSelected(),
 												},
 												t("delete.confirmYes"),
 											),
@@ -1317,31 +1769,74 @@ window.__ModuleLoader__.load({
 												"button",
 												{
 													type: "button",
-													className: "dsh-am-btn",
-													onClick: () => setConfirming(null),
+													className: "dsh-am-btn dsh-am-btn-ghost",
+													onClick: () => setBulkConfirm(false),
 												},
 												t("delete.confirmNo"),
 											),
-										)
-									: null,
-							);
-						}),
-					),
-				);
-			}
+										),
+									)
+								: h(
+										react.Fragment,
+										null,
+										h("span", { className: "dsh-am-bulk-count" }, t("bulk.selected", { count: selectedCount })),
+										h("span", { className: "dsh-am-bulk-hint" }, t("bulk.hint")),
+										h(
+											"div",
+											{ className: "dsh-am-bulk-actions" },
+											h(
+												"button",
+												{
+													type: "button",
+													className: "dsh-am-btn",
+													"aria-label": t("bulk.restore"),
+													disabled: progress !== null,
+													onClick: () => restoreSelected(),
+												},
+												h(Icon, { name: "restore", size: 12 }),
+												h("span", { className: "dsh-am-btn-label" }, t("bulk.restore")),
+											),
+											h(
+												"button",
+												{
+													type: "button",
+													className: "dsh-am-btn dsh-am-btn-danger",
+													"aria-label": t("bulk.delete"),
+													disabled: progress !== null || typeof props.deleteMany !== "function",
+													onClick: () => setBulkConfirm(true),
+												},
+												h(Icon, { name: "trash", size: 12 }),
+												h("span", { className: "dsh-am-btn-label" }, t("bulk.delete")),
+											),
+											h(
+												"button",
+												{
+													type: "button",
+													className: "dsh-am-icon-btn",
+													title: t("action.clearSelection"),
+													"aria-label": t("action.clearSelection"),
+													onClick: clearSelection,
+												},
+												h(Icon, { name: "close", size: 12 }),
+											),
+										),
+									),
+						)
+					: null;
 
 			const footer = h(
 				"div",
 				{ className: "dsh-am-foot" },
-				h(
-					"span",
-					null,
-					progress
-						? h("span", { className: "dsh-am-spinner" })
-						: t("foot.hint", { total }),
-				),
 				progress
-					? h("span", null, t("progress.running", { done: progress.done, total: progress.total }))
+					? h(
+							"span",
+							{ className: "dsh-am-foot-spinner" },
+							h("span", { className: "dsh-am-spinner" }),
+							h("span", null, t("progress.running", { done: progress.done, total: progress.total })),
+						)
+					: h("span", null, t("foot.hint", { total })),
+				progress
+					? null
 					: needle
 						? h("span", null, t("foot.filtered", { shown, total }))
 						: null,
@@ -1365,14 +1860,17 @@ window.__ModuleLoader__.load({
 				h(
 					"div",
 					{
+						ref: panelRef,
 						className: "dsh-am-panel",
 						role: "dialog",
 						"aria-label": t("panel.title"),
+						"data-dsh-am": "panel",
 						style: panelStyle,
 					},
 					header,
 					toolbar,
 					h("div", { className: "dsh-am-body" }, body),
+					bulkBar,
 					footer,
 					toast ? h("div", { className: "dsh-am-toast", "data-kind": toast.kind, key: toast.seq }, toast.text) : null,
 					handles,
@@ -1512,6 +2010,34 @@ window.__ModuleLoader__.load({
 				return value;
 			};
 
+			/** Delete a batch, reporting progress and collecting partial failures. */
+			const deleteMany = async (sessionIds, onProgress) => {
+				const ids = Array.isArray(sessionIds) ? sessionIds.slice() : [];
+				const failures = [];
+				let done = 0;
+				for (const id of ids) {
+					try {
+						await deleteSession(id);
+					} catch (error) {
+						failures.push({ id, error });
+					}
+					done += 1;
+					if (typeof onProgress === "function") {
+						try {
+							onProgress(done, ids.length);
+						} catch (error) {
+							/* a UI callback must not abort the batch */
+						}
+					}
+				}
+				if (failures.length) {
+					const error = new Error("deleted " + (ids.length - failures.length) + "/" + ids.length + " sessions");
+					error.failures = failures;
+					throw error;
+				}
+				return done;
+			};
+
 			ctx.slots.inject(SLOT, () =>
 				ctx.slots.register(
 					{
@@ -1529,6 +2055,7 @@ window.__ModuleLoader__.load({
 							openSession,
 							revealPath,
 							deleteSession,
+							deleteMany,
 							t,
 						}),
 					},
