@@ -52,6 +52,14 @@ window.__ModuleLoader__.load({
 			"action.restoreOpen": "恢复并打开",
 			"action.reveal": "在文件管理器中显示工作目录",
 			"action.restoreAll": "全部恢复",
+			"action.delete": "删除归档会话",
+			"delete.confirm": "永久删除「{title}」？会话记录文件会被移除，无法撤销。",
+			"delete.confirmYes": "删除",
+			"delete.confirmNo": "取消",
+			"toast.deleted": "已删除「{title}」",
+			"toast.deleteFailed": "删除失败：{reason}",
+			"toast.deleteActive": "该会话仍在运行，请先停止再删除",
+			"toast.deleteUnavailable": "当前 DSH 版本没有提供删除会话的接口",
 			"empty.title": "没有归档的会话",
 			"empty.hint": "在侧边栏的会话上右键，选择「归档会话」，它就会出现在这里。",
 			"empty.noMatch": "没有匹配的归档会话",
@@ -84,6 +92,14 @@ window.__ModuleLoader__.load({
 			"action.restoreOpen": "Restore and open",
 			"action.reveal": "Reveal working folder",
 			"action.restoreAll": "Restore all",
+			"action.delete": "Delete archived conversation",
+			"delete.confirm": "Permanently delete \"{title}\"? Its transcript file is removed and cannot be restored.",
+			"delete.confirmYes": "Delete",
+			"delete.confirmNo": "Cancel",
+			"toast.deleted": "Deleted \"{title}\"",
+			"toast.deleteFailed": "Delete failed: {reason}",
+			"toast.deleteActive": "This conversation is still running — stop it before deleting",
+			"toast.deleteUnavailable": "This DSH version exposes no delete-session API",
 			"empty.title": "No archived conversations",
 			"empty.hint": "Right-click a conversation in the sidebar and pick \u201cArchive session\u201d — it will show up here.",
 			"empty.noMatch": "No matching archived conversations",
@@ -217,6 +233,95 @@ window.__ModuleLoader__.load({
 		}
 
 		/* ------------------------------------------------------------------ *
+		 * Host Remote — `archiveManager/deleteSession`                        *
+		 *                                                                     *
+		 * Deleting a stored conversation is the one operation DSH does not    *
+		 * offer as a first-party client API, so this package ships a small    *
+		 * Host service (see src/index.js) and mounts its wire descriptor      *
+		 * here. Everything else in the panel stays first-party.               *
+		 * ------------------------------------------------------------------ */
+
+		/** Wire namespace and method of the only Remote this panel uses. */
+		const REMOTE_ENDPOINT = "archiveManager/deleteSession";
+
+		/**
+		 * Build one strict codec.
+		 *
+		 * `$mount` refuses descriptors whose parameter codecs are not strict,
+		 * and the registry wants a `typeSymbol` plus a `create` function — but
+		 * the browser never encodes a request or decodes a response for this
+		 * endpoint (it sends `{ sessionId }` and reads plain JSON), so `create`
+		 * only has to exist.
+		 *
+		 * @param typeSymbol - stable name reported to the registry.
+		 * @returns a strict codec with no schema of its own.
+		 */
+		function codec(typeSymbol) {
+			return { mode: "strict", typeSymbol: NS + "#" + typeSymbol, create: () => ({}) };
+		}
+
+		/** Descriptor for `archiveManager/deleteSession`. */
+		const REMOTE_DESCRIPTOR = {
+			id: NS + "#" + REMOTE_ENDPOINT,
+			service: "archiveManager",
+			namespace: "archiveManager",
+			method: "deleteSession",
+			description: "Delete the stored transcript of one archived conversation.",
+			invocation: { kind: "direct" },
+			parameters: [{ name: "request", wire: "request", source: "json", codec: codec("DeleteRequest") }],
+			result: codec("DeleteResult"),
+		};
+
+		/**
+		 * Mounted Remote namespaces, memoised per client context.
+		 *
+		 * Keyed by context rather than by module so a second composition (hot
+		 * reload, tests) mounts its own descriptor set instead of reusing a handle
+		 * bound to another gateway. Mounting is deferred to the first delete so a
+		 * gateway that is still warming up cannot poison the cache, and a failure is
+		 * remembered as `undefined` so the panel reports "unavailable" instead of
+		 * retrying on every click.
+		 */
+		const mountedNamespaces = new WeakMap();
+
+		/**
+		 * Resolve the Host delete service, mounting the descriptor on first use.
+		 *
+		 * @param ctx - client root context.
+		 * @returns the Remote namespace handle, or `undefined` when the gateway,
+		 *   the descriptor, or the Host service is unavailable.
+		 */
+		function deleteRemote(ctx) {
+			const existing = typeof ctx.get === "function" ? ctx.get("remote.archiveManager") : undefined;
+			if (existing && typeof existing.deleteSession === "function") return Promise.resolve(existing);
+
+			const cached = mountedNamespaces.get(ctx);
+			if (cached) return cached;
+
+			const remote = typeof ctx.get === "function" ? ctx.get("remote") : undefined;
+			const pending = (async () => {
+				if (!remote || typeof remote.$mount !== "function") return undefined;
+				try {
+					await remote.$mount({ package: NS, descriptors: [REMOTE_DESCRIPTOR] });
+				} catch (error) {
+					return undefined;
+				}
+				const service = typeof ctx.get === "function" ? ctx.get("remote.archiveManager") : undefined;
+				if (service && typeof service.deleteSession === "function") return service;
+				try {
+					const viaRemote = remote.archiveManager;
+					if (viaRemote && typeof viaRemote.deleteSession === "function") return viaRemote;
+				} catch (error) {
+					/* an unmounted namespace throws on access */
+				}
+				return undefined;
+			})().catch(() => undefined);
+
+			mountedNamespaces.set(ctx, pending);
+			return pending;
+		}
+
+		/* ------------------------------------------------------------------ *
 		 * Icons — inline paths on a 24x24 grid, drawn with currentColor.      *
 		 * ------------------------------------------------------------------ */
 		const ICONS = {
@@ -227,6 +332,7 @@ window.__ModuleLoader__.load({
 			search: "M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13z|M15.5 15.5 21 21",
 			close: "M6 6l12 12|M18 6 6 18",
 			checkAll: "M2.5 12.5l4 4 8-9|M12.5 15.5l1.5 1.5 8-9",
+			trash: "M4 7h16|M9.5 7V4.5h5V7|M6.5 7l1 13h9l1-13|M10.5 11v5|M13.5 11v5",
 		};
 
 		function Icon(props) {
@@ -485,6 +591,45 @@ window.__ModuleLoader__.load({
 .dsh-am-row:hover .dsh-am-row-actions,
 .dsh-am-row:focus-within .dsh-am-row-actions { opacity: 1; }
 @media (hover: none) { .dsh-am-row-actions { opacity: 1; } }
+.dsh-am-row[data-confirm="true"] { flex-wrap: wrap; }
+.dsh-am-row[data-confirm="true"] .dsh-am-row-actions { display: none; }
+.dsh-am-icon-btn.dsh-am-danger:hover,
+.dsh-am-icon-btn.dsh-am-danger:focus-visible {
+	color: var(--dsw-alias-label-error, #c0392b);
+	background: var(--dsw-alias-interactive-bg-hover-danger, rgba(192, 57, 43, 0.12));
+}
+.dsh-am-confirm {
+	flex: 1 0 100%;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 6px;
+	padding: 6px 8px;
+	border-radius: var(--dsw-radius-sm, 6px);
+	background: var(--dsw-alias-bg-layer-3, rgba(127, 127, 127, 0.08));
+	font-size: 11px;
+	line-height: 1.5;
+	color: var(--dsw-alias-label-secondary, #5b6270);
+}
+.dsh-am-confirm-text { flex: 1; min-width: 0; }
+.dsh-am-btn {
+	flex: none;
+	padding: 3px 9px;
+	border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.28));
+	border-radius: var(--dsw-radius-sm, 6px);
+	background: var(--dsw-alias-bg-layer-1, rgba(127, 127, 127, 0.06));
+	color: var(--dsw-alias-label-primary, #1f2430);
+	font: inherit;
+	font-size: 11px;
+	cursor: pointer;
+}
+.dsh-am-btn:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.12)); }
+.dsh-am-btn-danger {
+	border-color: rgba(192, 57, 43, 0.55);
+	background: #c0392b;
+	color: #fff;
+}
+.dsh-am-btn-danger:hover { background: #a93226; }
 .dsh-am-empty {
 	display: flex;
 	flex-direction: column;
@@ -712,6 +857,7 @@ window.__ModuleLoader__.load({
 			const [pending, setPending] = react.useState(null);
 			const [progress, setProgress] = react.useState(null);
 			const [toast, setToast] = react.useState(null);
+			const [confirming, setConfirming] = react.useState(null);
 			const dragRef = react.useRef(null);
 			const queryRef = react.useRef(null);
 			const toastSeq = react.useRef(0);
@@ -837,6 +983,35 @@ window.__ModuleLoader__.load({
 					await props.revealPath(row.cwd);
 				} catch (error) {
 					notify("error", t("toast.revealFailed", { reason: reasonOf(error) }));
+				}
+			};
+
+			const deleteRow = async (row) => {
+				setConfirming(null);
+				if (typeof props.deleteSession !== "function") {
+					notify("error", t("toast.deleteUnavailable"));
+					return;
+				}
+				setPending((current) => Object.assign({}, current || {}, { [row.id]: true }));
+				try {
+					await props.deleteSession(row.id);
+					notify("ok", t("toast.deleted", { title: ellipsis(row.title) }));
+				} catch (error) {
+					const code = error && error.code ? String(error.code) : "";
+					notify(
+						"error",
+						code === "session-active"
+							? t("toast.deleteActive")
+							: code === "unavailable"
+								? t("toast.deleteUnavailable")
+								: t("toast.deleteFailed", { reason: reasonOf(error) }),
+					);
+				} finally {
+					setPending((current) => {
+						const next = Object.assign({}, current || {});
+						delete next[row.id];
+						return next;
+					});
 				}
 			};
 
@@ -1042,9 +1217,15 @@ window.__ModuleLoader__.load({
 						),
 						group.rows.map((row) => {
 							const isBusy = busy(row.id);
+							const isConfirming = confirming === row.id;
 							return h(
 								"div",
-								{ className: "dsh-am-row", key: row.id, "data-busy": isBusy ? "true" : undefined },
+								{
+									className: "dsh-am-row",
+									key: row.id,
+									"data-busy": isBusy ? "true" : undefined,
+									"data-confirm": isConfirming ? "true" : undefined,
+								},
 								h(
 									"div",
 									{ className: "dsh-am-row-main" },
@@ -1101,7 +1282,48 @@ window.__ModuleLoader__.load({
 												h(Icon, { name: "folder", size: 14 }),
 											)
 										: null,
+									h(
+										"button",
+										{
+											type: "button",
+											className: "dsh-am-icon-btn dsh-am-danger",
+											title: typeof props.deleteSession === "function" ? t("action.delete") : t("toast.deleteUnavailable"),
+											"aria-label": t("action.delete"),
+											disabled: isBusy || progress !== null || typeof props.deleteSession !== "function",
+											onClick: () => setConfirming(row.id),
+										},
+										h(Icon, { name: "trash", size: 14 }),
+									),
 								),
+								isConfirming
+									? h(
+											"div",
+											{ className: "dsh-am-confirm" },
+											h(
+												"span",
+												{ className: "dsh-am-confirm-text" },
+												t("delete.confirm", { title: ellipsis(row.title) }),
+											),
+											h(
+												"button",
+												{
+													type: "button",
+													className: "dsh-am-btn dsh-am-btn-danger",
+													onClick: () => deleteRow(row),
+												},
+												t("delete.confirmYes"),
+											),
+											h(
+												"button",
+												{
+													type: "button",
+													className: "dsh-am-btn",
+													onClick: () => setConfirming(null),
+												},
+												t("delete.confirmNo"),
+											),
+										)
+									: null,
 							);
 						}),
 					),
@@ -1243,6 +1465,53 @@ window.__ModuleLoader__.load({
 				if (result && result.ok === false) throw result.error || new Error("reveal rejected");
 			};
 
+			/**
+			 * Delete one archived session through the Host Remote.
+			 *
+			 * The Host answers with a plain outcome rather than an error, so refusals
+			 * are translated here into a rejected promise carrying the reason as
+			 * `error.code`; the panel maps those codes to user-facing text.
+			 *
+			 * @param sessionId - the archived session to delete.
+			 */
+			const deleteSession = async (sessionId) => {
+				const service = await deleteRemote(ctx);
+				if (!service || typeof service.deleteSession !== "function") {
+					const error = new Error("deleteSession() is unavailable");
+					error.code = "unavailable";
+					throw error;
+				}
+				const result = await service.deleteSession({ sessionId });
+				if (result && result.ok === false) {
+					const failure = result.error || {};
+					const error = new Error(failure.message ? String(failure.message) : "deleteSession() failed");
+					error.code = failure.code ? String(failure.code) : "failed";
+					throw error;
+				}
+				const value = result && result.value !== undefined ? result.value : result;
+				if (!value || value.deleted !== true) {
+					const error = new Error(value && value.reason ? String(value.reason) : "not deleted");
+					error.code = value && value.reason ? String(value.reason) : "not-deleted";
+					throw error;
+				}
+				/*
+				 * The Host already dropped the id from the archive set, and its
+				 * registry change normally reaches this window through the workspace
+				 * stream. Replaying the unarchive round-trip makes the local archive
+				 * snapshot authoritative either way, so the row disappears even when
+				 * the stream is lagging behind the click.
+				 */
+				const workspaces = ctx.workspaces;
+				if (workspaces && typeof workspaces.unarchiveSession === "function") {
+					try {
+						await workspaces.unarchiveSession(sessionId);
+					} catch (error) {
+						/* a refused resync is repaired by the next workspace baseline */
+					}
+				}
+				return value;
+			};
+
 			ctx.slots.inject(SLOT, () =>
 				ctx.slots.register(
 					{
@@ -1259,6 +1528,7 @@ window.__ModuleLoader__.load({
 							restoreMany,
 							openSession,
 							revealPath,
+							deleteSession,
 							t,
 						}),
 					},

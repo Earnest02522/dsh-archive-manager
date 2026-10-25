@@ -20,6 +20,8 @@ or jump to the folder the conversation belongs to.
 > - **Search** — filter the archive by title, session id or working directory.
 > - **Restore & open** — restore a conversation and immediately reveal it in
 >   the main view.
+> - **Delete permanently** — remove an archived conversation from disk, after an
+>   inline confirmation.
 > - **Reveal the working directory** of an archived conversation.
 
 ## Features
@@ -40,31 +42,39 @@ or jump to the folder the conversation belongs to.
   is not available).
 - **Reveal working directory** — asks the host to reveal the session's `cwd`
   in the platform file manager (`session/openWorkspacePath { action: "reveal" }`).
+- **Delete permanently** — the only destructive action, behind an inline
+  `Delete?` confirmation. It asks the host to unlink the session's transcript,
+  drops the id from `archivedSessionIds`, detaches it from its workspace and
+  announces `api-session/removed`, so the sidebar forgets it without a restart.
+  Conversations with running work are refused (`session-active`).
 - **Keyboard and pointer friendly** — `Esc` closes the panel, the header drags,
   all eight edges/corners resize, the geometry is clamped to the viewport, and
   row actions stay visible on touch devices.
 - **i18n** — Chinese and English UI text, picked from the DSH locale first and
   the browser language second.
-- **Client-only, zero build** — no host service, no Typert remote, no compile
-  step. Plain ESM sources plus a module-loader browser bundle.
+- **Client-side UI, one Host Remote** — the panel is plain ESM served straight
+  to the browser (no build step); the single destructive operation is a small
+  host service instead of a filesystem hack from the page.
 
-## Why this is a client-only plugin now
+## Why most of this is a client-only plugin
 
 Older releases (≤ 0.5.x) registered a root Typert Remote service
 (`ctx.archiveManager`) on the host and mounted a hand-written descriptor from
-the browser bundle with `ctx.remote.$mount(...)`. DSH 0.2 validates contributed
-descriptors strictly (`validateContribution` → `requireStrictInputs`, plus
-namespace collisions against the built-in `remote.*` services), and the archive
-feature became a first-class part of the `workspaces` client service. A custom
-remote is therefore both fragile and unnecessary.
+the browser bundle with `ctx.remote.$mount(...)`. That design did not survive
+DSH 0.2: contributed descriptors are validated strictly (`validateContribution`
+→ `requireStrictInputs`, plus namespace collisions against the built-in
+`remote.*` services), and the archive feature became a first-class part of the
+`workspaces` client service. Everything reversible — listing, search, restore,
+open, reveal — therefore talks to services DSH already provides.
 
-v0.6.0 keeps only the part that has to be custom — the UI — and talks to the
-services DSH already provides:
+Deletion is the one thing DSH does **not** provide. There is no delete endpoint
+in `sessionController`, nothing writable in `workspace-files`, and the browser
+cannot touch `~/.dsh/sessions/...`. So v0.7.0 adds exactly one Host Remote:
 
 | Layer | What happens |
 |---|---|
-| Host plugin (`src/index.js`) | `export function apply() {}` — deliberately empty. No service, no inject list, no patch beyond registering the bundle. |
-| Browser plugin (`src/client.js`) | Registers a `sidebar.footer.action` slot entry. Reads `workspaces.list` (`{ items, archivedSessionIds, pinnedSessionIds, … }`) and `sessions.list` (`{ ids, byId, … }`) as reactive snapshot stores, groups archived ids by workspace accounting, restores through `workspaces.unarchiveSession(id)`, opens through `uiWorkspace.openSession(id)`, and reveals through `remote.session.openWorkspacePath({ path, action: "reveal" })`. |
+| Host plugin (`src/index.js`) | `ArchiveManagerService extends TypertRemoteService` (service key / namespace `archiveManager`) with one remote method, `deleteSession(request)`: checks for running work, locates the transcript through `sessionPersistence.stat` + `locate`, unlinks it, prunes the id from `archivedSessionIds`, detaches it from every workspace, and emits `api-session/removed`. The method returns an outcome value (`{ deleted: true, … }` or `{ deleted: false, reason }`) instead of throwing. |
+| Browser plugin (`src/client.js`) | Registers a `sidebar.footer.action` slot entry. Reads `workspaces.list` (`{ items, archivedSessionIds, pinnedSessionIds, … }`) and `sessions.list` (`{ ids, byId, … }`) as reactive snapshot stores, restores through `workspaces.unarchiveSession(id)`, opens through `uiWorkspace.openSession(id)`, reveals through `remote.session.openWorkspacePath({ path, action: "reveal" })`, and deletes through the mounted `remote.archiveManager.deleteSession({ sessionId })`. If that mount fails, the panel still renders and the delete action reports itself as unavailable. |
 
 No DSH source is patched. The plugin is discovered by the standard loader (the
 profile's `cordis.patch.yml` / `dsh.profile.bundles`) and its browser half by
@@ -73,12 +83,19 @@ the client module loader (`dsh.client.platform = "web"`).
 ## Compatibility
 
 - **DSH 0.2.1-rc.3 and newer (desktop app)** — verified against
-  `@deepseek-ai/dsh-desktop-runtime 0.2.1-rc.3`: the bundle is served, the slot
-  is registered and the panel renders against the live `workspaces` /
-  `sessions` / `remote.session` services.
+  `@deepseek-ai/dsh-desktop-runtime 0.2.1-rc.3`: the host service registers, the
+  `archiveManager/deleteSession` endpoint answers over the real gateway, the
+  bundle is served, the slot is registered and the panel renders against the live
+  `workspaces` / `sessions` / `remote.session` services.
+- **Version gate:** the manifest declares `engines.dsh` (`>=0.2.1-0 <1.0.0`),
+  which is the only requirement DSH 0.2 evaluates. Older releases relied on
+  `@deepseek-ai/dsh-*` peer ranges instead, and semver prerelease rules made
+  `0.2.1-rc.3` fail `>=0.1.0-rc.6` — that is exactly why 0.5.x was reported as
+  incompatible with the current desktop app.
 - **DSH 0.1.x is no longer supported.** The plugin relies on the `workspaces`
-  client service (archive snapshot + `unarchiveSession`) and the
-  `session/openWorkspacePath` endpoint, both introduced with the 0.2 line.
+  client service (archive snapshot + `unarchiveSession`), the
+  `session/openWorkspacePath` endpoint, and the `TypertRemoteService` /
+  `@Remote` host API of the 0.2 line.
 - Platform-agnostic: revealing a folder is delegated to the host, so it works
   with Explorer, Finder and xdg-open alike.
 
@@ -172,6 +189,11 @@ patch template automatically.
 - The sidebar foot shows a **归档 / Archive** button next to Settings.
 - Click it: archived conversations appear under their workspace headings with
   search, row actions and a footer counter.
+- Hover a row: the trash icon offers **Delete**; it asks for an inline
+  confirmation and, once confirmed, reports `已删除 / Deleted`. Running
+  conversations are refused, and the row disappears on its own.
+- The host half is live when `archiveManager/deleteSession` answers; a missing
+  host half only disables the trash icon (the rest still works).
 - With DSH's devtools open, the browser bundle
   `plugins/??dsh-archive-manager/client.js` must appear in the page's preload
   list and must not raise a module-loader error.
@@ -191,64 +213,78 @@ delete `<profile>/node_modules/dsh-archive-manager`.
 
 ## Development
 
-No build step: `src/index.js` is the (empty) host plugin, `src/client.js` is the
-browser bundle in module-loader format. Sanity checks:
+No build step: `src/index.js` is the host plugin (one remote method),
+`src/client.js` is the browser bundle in module-loader format. Sanity checks:
 
 ```powershell
 node --check src/index.js
 node --check src/client.js
-npm test
+node test/client.test.mjs
 ```
 
-`npm test` runs `test/client.test.mjs`, a dependency-free harness with a
-hand-written mini React runtime that stubs `window.__ModuleLoader__`,
-`document` and `navigator`, applies the plugin to a fake `ctx`, and asserts 69
-behaviours: the load contract, slot registration (`name` / `id` / `order` /
-`locale`), Chinese fallback translation, grouping (3 workspaces → 3 groups),
-search filtering, single restore (service call + toast + reactive row removal),
-restore-and-open, bulk restore, reveal request payload, degraded mode without
-`unarchiveSession`, empty-archive and narrow-sidebar rendering, drag/resize
-geometry math, and `Esc` handling.
+`node test/client.test.mjs` runs `test/client.test.mjs`, a dependency-free
+harness with a hand-written mini React runtime that stubs
+`window.__ModuleLoader__`, `document` and `navigator`, applies the plugin to a
+fake `ctx`, and asserts 111 behaviours: the load contract, slot registration
+(`name` / `id` / `order` / `locale`), Chinese fallback translation, grouping
+(3 workspaces → 3 groups), search filtering, single restore (service call +
+toast + reactive row removal), restore-and-open, bulk restore, reveal request
+payload, the delete confirmation flow (nothing is deleted before you confirm,
+the descriptor carries the strict codecs the gateway requires, the mount is
+reused, the archive snapshot is re-synced afterwards), refused deletion while a
+conversation is running, degraded mode
+without `unarchiveSession` or without a remote gateway, empty-archive and
+narrow-sidebar rendering, drag/resize geometry math, `Esc` handling, plus
+static assertions over both halves (browser bundle: only `react` is required,
+no `$mount` on hand-written descriptors for the old endpoints, no `unlink`;
+host half: imports only `node:fs/promises` and the Typert protocol, unlinks a
+single file and never a directory tree).
 
 The plugin's own sources are the only inputs; the harness never touches a DSH
 installation.
 
-## Why there is no "delete" (and why the plugin does not add one)
+## How delete works (and what it costs)
 
-Deleting a conversation is **not something DSH supports**, by design, and this
-plugin intentionally stays within that boundary:
+Deleting is **not** an archive operation — archive only hides a session id.
+`Delete` is destructive and irreversible:
 
-1. **The persistence seam has no delete interface.** DSH stores every session
-   as an append-only JSONL log under `~/.dsh/sessions/...`. The
-   `dsh-session-persistence-jsonl` README states: *"logs accumulate under the
-   root until removed externally (the seam has no delete interface)"*. No DSH
-   code — including this plugin — ever unlinks a transcript file.
-2. **"Archive" is a soft hide, not deletion.** The built-in *Archive session*
-   action only adds the session id to `archivedSessionIds`; the log, the
-   workspace accounting slot, and the session's data all remain intact. That is
-   precisely what makes *restore* possible.
-3. **Session cleanup is out-of-band.** If you really want a transcript gone,
-   the supported way is to stop DSH and remove the session's directory under
-   `~/.dsh/sessions/--<project>--/<session-id>/` yourself (the search index then
-   reconciles the entry away on the next scan). The *Reveal working directory*
-   action helps you get to a conversation's project folder quickly.
+1. **It refuses while the conversation is running.** The host asks the
+   `workspace/session-activity` waterfall first; any active work means the
+   request comes back as `{ deleted: false, reason: "session-active" }` and the
+   panel tells you to stop the run first.
+2. **It removes the transcript file.** The host resolves the log through
+   `sessionPersistence.stat(id)` + `locate(...)` (which handles compressed
+   `.jsonl.zstd` logs) and unlinks exactly that one file. If the file is gone
+   already, the call still succeeds with `existed: false`.
+3. **It cleans up the bookkeeping.** The id is dropped from
+   `archivedSessionIds` (`workspaces.unarchiveSession`), detached from every
+   workspace that lists it, and `api-session/removed` is emitted so open windows
+   drop the row without a restart. DSH's own query index reconciles the missing
+   log on its next scan.
+4. **It cannot be undone.** There is no trash, no undo, and the built-in
+   *Restore* action has nothing left to restore. If you only want a
+   conversation out of the way, use *Archive* instead.
 
-In short: **view and restore are reversible and safe; physical deletion is
-deliberately out of scope** — a destructive "delete" button would fight the
-storage design (append-only logs, rebuildable indexes) and could silently
-destroy data this plugin cannot restore.
+Because the persistence seam deliberately exposes no delete interface, this is
+the one place where the plugin goes beyond DSH's own API surface — hence the
+explicit confirmation step and the "still running" guard.
 
 ## Known limitations
 
-- **No "delete" feature by design** — see above.
+- **Delete is permanent** — no trash, no undo. The action is gated behind an
+  inline confirmation and refuses sessions with running work, but once it
+  succeeds the transcript is gone.
 - **Reveal targets the working directory**, not the transcript directory: DSH
   0.2 no longer exposes a session-log path to client plugins, so the old
   "open conversation folder" action was re-pointed at `session.cwd`.
-- The panel refreshes optimistically on restore; the authoritative
+- **The projection cache is left behind.** Deleting unlinks the session log; the
+  small entry under `storages/session_projcache/` is DSH's own cache and is
+  reconciled by the host on the next scan, so the plugin does not touch it.
+- The panel refreshes optimistically on restore and delete; the authoritative
   `archivedSessionIds` set re-syncs with the next workspace baseline
   (reconnect / list refresh).
-- Restoring a session whose agent is still running is refused by the host
-  (`workspace/session-active`); the panel surfaces that as an error toast.
+- Restoring or deleting a session whose agent is still running is refused by the
+  host; the panel surfaces that as an error toast.
 
 ## License
 

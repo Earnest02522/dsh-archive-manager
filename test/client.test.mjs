@@ -390,7 +390,7 @@ function propsFor(registration, extra) {
  */
 function makeContext(options) {
 	const config = options || {};
-	const calls = { unarchive: [], revealed: [], opened: [] };
+	const calls = { unarchive: [], revealed: [], opened: [], deleted: [], mounts: 0, contribution: null };
 	const workspacesStore = makeStore(config.workspaces || archiveSnapshot());
 	const sessionsStore = makeStore(config.sessions || sessionSnapshot());
 	const services = {
@@ -418,6 +418,43 @@ function makeContext(options) {
 			async openWorkspacePath(request) {
 				calls.revealed.push(request);
 				return { ok: true };
+			},
+		};
+	}
+	if (config.delete !== "missing") {
+		services.remote = {
+			async $mount(contribution) {
+				calls.mounts += 1;
+				calls.contribution = contribution;
+				if (config.delete === "mount-fails") throw new Error("mount rejected");
+				const descriptor = contribution.descriptors[0];
+				services["remote." + descriptor.namespace] = {
+					async [descriptor.method](request) {
+						calls.deleted.push(request.sessionId);
+						if (config.delete === "active") {
+							return {
+								ok: true,
+								value: { sessionId: request.sessionId, deleted: false, reason: "session-active" },
+							};
+						}
+						const state = workspacesStore.getSnapshot();
+						workspacesStore.set(
+							Object.assign({}, state, {
+								archivedSessionIds: state.archivedSessionIds.filter((id) => id !== request.sessionId),
+							}),
+						);
+						return {
+							ok: true,
+							value: {
+								sessionId: request.sessionId,
+								deleted: true,
+								existed: true,
+								path: "C:\\sessions\\" + request.sessionId + ".jsonl",
+								pruned: true,
+							},
+						};
+					},
+				};
 			},
 		};
 	}
@@ -629,15 +666,147 @@ async function main() {
 	emptyView.dispose();
 	dragView.dispose();
 
+	console.log("\n# delete archived conversation");
+	const deleteHarness = makeContext();
+	exports.apply(deleteHarness.ctx);
+	const deleteRegistration = deleteHarness.registrations[0];
+	const deleteProps = deleteRegistration.options.inject();
+	const deleteView = mount(deleteRegistration.Component, () => propsFor(deleteRegistration, { wide: true }));
+	findAll(deleteView.tree, byClass("dsh-am-trigger"))[0].props.onClick();
+	check("no confirmation strip before asking", findAll(deleteView.tree, byClass("dsh-am-confirm")).length === 0);
+	const deleteLabel = deleteProps.t("action.delete");
+	const firstDeleteButton = findAll(findAll(deleteView.tree, byClass("dsh-am-row"))[0], byLabel(deleteLabel))[0];
+	check("delete button rendered", Boolean(firstDeleteButton));
+	firstDeleteButton.props.onClick();
+	const strip = findAll(deleteView.tree, byClass("dsh-am-confirm"))[0];
+	check("confirmation strip appears", Boolean(strip));
+	check("confirmation names the conversation", textOf(strip).indexOf("Fix the parser") !== -1, textOf(strip));
+	check("nothing deleted before confirming", deleteHarness.calls.deleted.length === 0);
+	const cancelButton = findAll(strip, byClass("dsh-am-btn"))[1];
+	check("cancel button rendered", Boolean(cancelButton));
+	cancelButton.props.onClick();
+	check("cancel closes the strip", findAll(deleteView.tree, byClass("dsh-am-confirm")).length === 0);
+	check("cancel deletes nothing", deleteHarness.calls.deleted.length === 0);
+
+	findAll(findAll(deleteView.tree, byClass("dsh-am-row"))[0], byLabel(deleteLabel))[0].props.onClick();
+	const confirmStrip = findAll(deleteView.tree, byClass("dsh-am-confirm"))[0];
+	const confirmButton = findAll(confirmStrip, byClass("dsh-am-btn-danger"))[0];
+	check("confirm button rendered", Boolean(confirmButton));
+	await confirmButton.props.onClick();
+	equal("delete requested for the archived session", deleteHarness.calls.deleted.join(","), "s-alpha-1");
+	check(
+		"delete re-syncs the archived snapshot",
+		deleteHarness.calls.unarchive.indexOf("s-alpha-1") !== -1,
+		deleteHarness.calls.unarchive.join(","),
+	);
+	equal("row removed after delete", findAll(deleteView.tree, byClass("dsh-am-row")).length, 2);
+	check(
+		"delete toast",
+		textOf(findAll(deleteView.tree, byClass("dsh-am-toast"))[0]).indexOf("已删除") !== -1,
+		textOf(findAll(deleteView.tree, byClass("dsh-am-toast"))[0]),
+	);
+	equal("descriptor mounted once", deleteHarness.calls.mounts, 1);
+	equal("descriptor package", deleteHarness.calls.contribution.package, "dsh-archive-manager");
+	equal("descriptor namespace", deleteHarness.calls.contribution.descriptors[0].namespace, "archiveManager");
+	equal("descriptor method", deleteHarness.calls.contribution.descriptors[0].method, "deleteSession");
+	equal(
+		"descriptor parameter wire",
+		deleteHarness.calls.contribution.descriptors[0].parameters[0].wire,
+		"request",
+	);
+	equal(
+		"descriptor parameters are strict",
+		deleteHarness.calls.contribution.descriptors[0].parameters[0].codec.mode,
+		"strict",
+	);
+
+	findAll(findAll(deleteView.tree, byClass("dsh-am-row"))[0], byLabel(deleteLabel))[0].props.onClick();
+	await findAll(findAll(deleteView.tree, byClass("dsh-am-confirm"))[0], byClass("dsh-am-btn-danger"))[0].props.onClick();
+	equal("second delete reuses the mounted namespace", deleteHarness.calls.mounts, 1);
+	equal("second delete requested", deleteHarness.calls.deleted.length, 2);
+
+	console.log("\n# delete refused while the conversation is running");
+	const activeHarness = makeContext({ delete: "active" });
+	exports.apply(activeHarness.ctx);
+	const activeRegistration = activeHarness.registrations[0];
+	const activeView = mount(activeRegistration.Component, () => propsFor(activeRegistration, { wide: true }));
+	findAll(activeView.tree, byClass("dsh-am-trigger"))[0].props.onClick();
+	findAll(findAll(activeView.tree, byClass("dsh-am-row"))[0], byLabel(deleteLabel))[0].props.onClick();
+	await findAll(findAll(activeView.tree, byClass("dsh-am-confirm"))[0], byClass("dsh-am-btn-danger"))[0].props.onClick();
+	equal("delete attempted", activeHarness.calls.deleted.join(","), "s-alpha-1");
+	equal("row kept when the Host refuses", findAll(activeView.tree, byClass("dsh-am-row")).length, 3);
+	check(
+		"running-conversation toast",
+		textOf(findAll(activeView.tree, byClass("dsh-am-toast"))[0]).indexOf("仍在运行") !== -1,
+		textOf(findAll(activeView.tree, byClass("dsh-am-toast"))[0]),
+	);
+
+	console.log("\n# delete without a gateway");
+	const offlineHarness = makeContext({ delete: "missing" });
+	exports.apply(offlineHarness.ctx);
+	const offlineRegistration = offlineHarness.registrations[0];
+	const offlineView = mount(offlineRegistration.Component, () => propsFor(offlineRegistration, { wide: true }));
+	findAll(offlineView.tree, byClass("dsh-am-trigger"))[0].props.onClick();
+	findAll(findAll(offlineView.tree, byClass("dsh-am-row"))[0], byLabel(deleteLabel))[0].props.onClick();
+	await findAll(findAll(offlineView.tree, byClass("dsh-am-confirm"))[0], byClass("dsh-am-btn-danger"))[0].props.onClick();
+	check(
+		"unavailable toast",
+		textOf(findAll(offlineView.tree, byClass("dsh-am-toast"))[0]).indexOf("没有提供删除会话的接口") !== -1,
+		textOf(findAll(offlineView.tree, byClass("dsh-am-toast"))[0]),
+	);
+	equal("nothing deleted without a gateway", offlineHarness.calls.deleted.length, 0);
+	equal("row kept without a gateway", findAll(offlineView.tree, byClass("dsh-am-row")).length, 3);
+
+	const mountFailHarness = makeContext({ delete: "mount-fails" });
+	exports.apply(mountFailHarness.ctx);
+	const mountFailRegistration = mountFailHarness.registrations[0];
+	const mountFailView = mount(mountFailRegistration.Component, () => propsFor(mountFailRegistration, { wide: true }));
+	findAll(mountFailView.tree, byClass("dsh-am-trigger"))[0].props.onClick();
+	findAll(findAll(mountFailView.tree, byClass("dsh-am-row"))[0], byLabel(deleteLabel))[0].props.onClick();
+	await findAll(findAll(mountFailView.tree, byClass("dsh-am-confirm"))[0], byClass("dsh-am-btn-danger"))[0].props.onClick();
+	check(
+		"rejected mount degrades to unavailable",
+		textOf(findAll(mountFailView.tree, byClass("dsh-am-toast"))[0]).indexOf("没有提供删除会话的接口") !== -1,
+		textOf(findAll(mountFailView.tree, byClass("dsh-am-toast"))[0]),
+	);
+
+	deleteView.dispose();
+	activeView.dispose();
+	offlineView.dispose();
+	mountFailView.dispose();
+
 	console.log("\n# bundle surface");
 	const source = readFileSync(new URL("../src/client.js", import.meta.url), "utf8");
 	const requires = Array.from(new Set(Array.from(source.matchAll(/require\("([^"]+)"\)/g), (match) => match[1])));
 	equal("module dependencies", requires.join(","), "react");
-	check("no legacy typert mount", source.indexOf("$mount") === -1);
 	check("no hand-written remote descriptors", source.indexOf("TYPERT_REMOTE") === -1);
-	check("no custom remote namespace calls", source.indexOf("archiveManager/") === -1);
+	check("mounts exactly one Remote", (source.match(/\$mount\(/g) || []).length === 1);
+	check("declares the delete endpoint", source.indexOf('"archiveManager/deleteSession"') !== -1);
+	check("no legacy archive Remote endpoints", source.indexOf("archiveManager/unarchive") === -1);
 	check("restores through the workspaces service", source.indexOf("workspaces.unarchiveSession") !== -1);
 	check("reveals through the session remote", source.indexOf("openWorkspacePath") !== -1);
+	check("browser half never deletes files itself", source.indexOf("unlink(") === -1);
+
+	console.log("\n# host surface");
+	const hostSource = readFileSync(new URL("../src/index.js", import.meta.url), "utf8");
+	const hostImports = Array.from(new Set(Array.from(hostSource.matchAll(/from "([^"]+)"/g), (match) => match[1])));
+	equal("host dependencies", hostImports.join(","), "node:fs/promises,@deepseek-ai/dsh-typert-protocol");
+	check("host declares the Remote marker", hostSource.indexOf("Remote(DELETE_METHOD)") !== -1);
+	check("host extends TypertRemoteService", hostSource.indexOf("extends TypertRemoteService") !== -1);
+	check("host deletes through unlink only", hostSource.indexOf("unlink(") !== -1);
+	check(
+		"host never deletes recursively",
+		hostSource.indexOf("rmSync") === -1 && hostSource.indexOf("rmdir") === -1 && hostSource.indexOf("recursive: true") === -1,
+	);
+	check("host prunes the archive set", hostSource.indexOf("unarchiveSession") !== -1);
+	check("host detaches workspace references", hostSource.indexOf("detachSession") !== -1);
+	check("host announces the removal", hostSource.indexOf("api-session/removed") !== -1);
+	check("host exposes apply", /export function apply\(ctx\)/.test(hostSource));
+
+	const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+	equal("declares engines.dsh", typeof manifest.engines.dsh, "string");
+	check("engines.dsh admits 0.2.1 prereleases", /^>=0\.2\.1-0/.test(manifest.engines.dsh), manifest.engines.dsh);
+	check("client half is declared web-only", manifest.dsh.client.platform === "web");
 
 	// Every key the panel asks for must exist in both bundled dictionaries, or
 	// the UI would fall back to showing a raw key in one language only.
