@@ -1,5 +1,12 @@
-# dsh-archive-manager bundle patch：`dsh plugin add` 安装后自动挂载此 loader 行。
-# 与 scripts/install.ps1 手动写入的条目一致（手动方式仍受支持）。
+# dsh-archive-manager — loader patch, shipped as this package's bundle layer.
+#
+# `dsh plugin --profile <profile> add <spec>` (or ./scripts/install.ps1 /
+# ./scripts/install.sh) registers this package in the profile's
+# `dsh.profile.bundles`. The loader then applies this file as one layer of the
+# plugin tree, and the entry below is what actually mounts the plugin.
+#
+# Keep `id` and `name` identical to the package name: `name` is resolved from
+# the profile's node_modules, so a rename here must match package.json.
 - insert:
     - id: dsh-archive-manager
-      name: 'dsh-archive-manager'
+      name: dsh-archive-manager

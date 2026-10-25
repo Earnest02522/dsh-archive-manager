@@ -1,7 +1,7 @@
 {
   "name": "dsh-archive-manager",
-  "version": "0.5.0",
-  "description": "Archived-conversation manager for DeepSeek Harness: view (grouped by workspace), restore (single or bulk), and reveal transcript folders of archived conversations. Works on DSH 0.2.x (desktop) and 0.1.x (web).",
+  "version": "0.6.0",
+  "description": "Archived-conversation manager for DeepSeek Harness: a sidebar panel that lists archived conversations grouped by workspace, with single and bulk restore. Client-only UI plugin for DSH 0.2.x and newer.",
   "type": "module",
   "main": "src/index.js",
   "exports": {
@@ -16,6 +16,9 @@
     "README.zh-CN.md",
     "LICENSE"
   ],
+  "scripts": {
+    "test": "node test/client.test.mjs"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -32,13 +35,11 @@
     "deepseek-harness",
     "plugin",
     "archive",
-    "conversation"
+    "conversation",
+    "sidebar"
   ],
   "peerDependencies": {
-    "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-api-gateway": ">=0.1.0-rc.6",
-    "@deepseek-ai/dsh-typert-protocol": ">=0.1.0-rc.6",
-    "@deepseek-ai/dsh-workspace": ">=0.1.0-rc.6"
+    "@deepseek-ai/cordis": "~4.0.5"
   },
   "engines": {
     "node": ">=20"

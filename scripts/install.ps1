@@ -1,9 +1,12 @@
 # dsh-archive-manager — Windows install script
 #
 # Copies this plugin into the DSH profile's plugin directory and enables it in
-# the profile's cordis.patch.yml. Supports both DSH layouts:
-#   - DSH 0.2.x desktop: <profile>/node_modules
-#   - DSH 0.1.x web:     profiles/node_modules (hoisted)
+# the profile's cordis.patch.yml. Targets DSH 0.2.x and newer:
+#   - per-profile layout: <profile>/node_modules
+#   - older/hoisted layout: profiles/node_modules (fallback)
+#
+# Prefer the official CLI when you can:
+#   npx --yes @deepseek-ai/dsh plugin --profile desktop add <spec>
 #
 # Usage:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
@@ -103,4 +106,4 @@ Write-Host ""
 Write-Host "Next steps:"
 Write-Host "  1. Restart DSH (or let the patch HMR re-compose the config)."
 Write-Host "  2. Hard-refresh the browser/desktop window (Ctrl+Shift+R)."
-Write-Host "  3. Look for the '归档 / Archive' button at the bottom of the sidebar."
+Write-Host "  3. Look for the 'Archive' button at the bottom of the sidebar."

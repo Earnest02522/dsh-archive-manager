@@ -3,9 +3,12 @@
 # dsh-archive-manager — install script (Linux / macOS)
 #
 # Copies this plugin into the DSH profile's plugin directory and enables it in
-# the profile's cordis.patch.yml. Supports both layouts:
-#   - DSH 0.2.x desktop: <profile>/node_modules
-#   - DSH 0.1.x web:     profiles/node_modules (hoisted)
+# the profile's cordis.patch.yml. Targets DSH 0.2.x and newer:
+#   - per-profile layout: <profile>/node_modules
+#   - older/hoisted layout: profiles/node_modules (fallback)
+#
+# Prefer the official CLI when you can:
+#   npx --yes @deepseek-ai/dsh plugin --profile desktop add <spec>
 #
 # Usage:
 #   bash scripts/install.sh                 # auto-detect profile (desktop, then web)
@@ -20,7 +23,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DSH_HOME_DIR="${DSH_HOME:-$HOME/.dsh}"
 PROFILES_DIR="$DSH_HOME_DIR/profiles"
 
-# Auto-detect: desktop (0.2.x) -> web (0.1.x) -> first non-node_modules profile.
+# Auto-detect: desktop -> web -> first non-node_modules profile.
 if [ -z "$PROFILE" ]; then
   if [ -d "$PROFILES_DIR/desktop" ]; then PROFILE="desktop"
   elif [ -d "$PROFILES_DIR/web" ]; then PROFILE="web"
@@ -34,7 +37,7 @@ if [ -z "$PROFILE" ]; then
 fi
 
 PROFILE_DIR="$PROFILES_DIR/$PROFILE"
-# 0.2.x keeps a per-profile node_modules; 0.1.x used the hoisted one.
+# 0.2.x keeps a per-profile node_modules; the hoisted one is a legacy fallback.
 if [ -d "$PROFILE_DIR/node_modules" ]; then
   NODE_MODULES="$PROFILE_DIR/node_modules"
 else
