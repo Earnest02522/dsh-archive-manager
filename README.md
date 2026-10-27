@@ -21,7 +21,9 @@ or jump to the folder the conversation belongs to.
 > - **Restore & open** — restore a conversation and immediately reveal it in
 >   the main view.
 > - **Delete, one or many** — remove archived conversations from disk, after an
->   inline confirmation that happens *on the row* (or once for a batch).
+>   inline confirmation that happens *on the row* (or once for a batch, or once
+>   per workspace group).
+> - **Restore or delete a whole workspace group** from its heading.
 > - **Reveal the working directory** of an archived conversation.
 
 ## Features
@@ -36,12 +38,18 @@ or jump to the folder the conversation belongs to.
   accounting and the durability layer all stay in sync.
 - **Restore all** — restores every archived conversation (and every
   conversation matching the current search) sequentially, reporting partial
-  failures instead of stopping.
+  failures instead of stopping. It sits in the panel footer, deliberately far
+  from the ✕ and labelled — one gap away from the close button it was too easy
+  to hit by accident.
 - **Multi-select** — every row carries a checkbox that appears on hover (always
   visible on touch); a bulk bar then offers *Restore selected*, *Delete
   selected* and *Clear*, and the header toggles *Select all* over the visible
   rows. The selection is pruned against the live archive set, so a batch can
   never act on a row that has already gone.
+- **Per-workspace actions** — each workspace heading reveals *restore this
+  group* and *delete this group* on hover, with the count baked into the
+  tooltip. Deleting a group asks in place, inside its own heading, for that
+  group only.
 - **Restore & open** — restores and then opens the conversation in the main
   view through the `uiWorkspace` service (skipped gracefully when that service
   is not available).
@@ -77,7 +85,7 @@ open, reveal — therefore talks to services DSH already provides.
 
 Deletion is the one thing DSH does **not** provide. There is no delete endpoint
 in `sessionController`, nothing writable in `workspace-files`, and the browser
-cannot touch `~/.dsh/sessions/...`. So v0.8.0 adds exactly one Host Remote:
+cannot touch `~/.dsh/sessions/...`. So v0.7.0 added exactly one Host Remote:
 
 | Layer | What happens |
 |---|---|
@@ -204,6 +212,10 @@ patch template automatically.
 - Tick a few checkboxes: the bulk bar appears above the footer with *Restore
   selected* / *Delete selected*; deleting a batch asks once for the whole
   selection.
+- Hover a workspace heading: *restore this group* and *delete this group*
+  appear on the right; deleting asks inside the heading and touches only that
+  group.
+- *Restore all* sits in the footer with a label, not next to the ✕.
 - Click anywhere outside the panel: it folds away, exactly like pressing `Esc`.
 - The host half is live when `archiveManager/deleteSession` answers; a missing
   host half only disables the trash icon (the rest still works).
@@ -238,7 +250,7 @@ node test/client.test.mjs
 `node test/client.test.mjs` runs `test/client.test.mjs`, a dependency-free
 harness with a hand-written mini React runtime that stubs
 `window.__ModuleLoader__`, `document` and `navigator`, applies the plugin to a
-fake `ctx`, and asserts 142 behaviours: the load contract, slot registration
+fake `ctx`, and asserts 160 behaviours: the load contract, slot registration
 (`name` / `id` / `order` / `locale`), Chinese fallback translation, grouping
 (3 workspaces → 3 groups), search filtering, single restore (service call +
 toast + reactive row removal), restore-and-open, bulk restore, reveal request
@@ -246,8 +258,10 @@ payload, the row-inline delete confirmation (the row keeps its place and the
 panel keeps its geometry, nothing is deleted before you confirm, the descriptor
 carries the strict codecs the gateway requires, the mount is reused, the archive
 snapshot is re-synced afterwards), multi-select restore and delete, *Select
-all*, click-away dismissal, refused deletion while a conversation is running,
-degraded mode without `unarchiveSession` or without a remote gateway,
+all*, per-workspace restore and delete (the group asks inside its own heading
+and only that group is touched), restore-all living in the footer instead of
+beside the ✕, click-away dismissal, refused deletion while a conversation is
+running, degraded mode without `unarchiveSession` or without a remote gateway,
 empty-archive and narrow-sidebar rendering, drag/resize geometry math, `Esc`
 handling, plus static assertions over both halves (browser bundle: only `react`
 is required, no `$mount` on hand-written descriptors for the old endpoints, no

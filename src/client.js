@@ -66,6 +66,9 @@ window.__ModuleLoader__.load({
 			"bulk.restore": "恢复所选",
 			"bulk.delete": "删除所选",
 			"bulk.confirm": "永久删除这 {count} 个归档会话？",
+			"group.restore": "恢复该组的 {count} 个会话",
+			"group.delete": "删除该组的 {count} 个会话",
+			"group.confirm": "永久删除该组的 {count} 个会话？",
 			"toast.deleted": "已删除「{title}」",
 			"toast.deletedMany": "已删除 {count} 个会话",
 			"toast.deletedPartial": "已删除 {done} 个，{failed} 个失败",
@@ -118,6 +121,9 @@ window.__ModuleLoader__.load({
 			"bulk.restore": "Restore selected",
 			"bulk.delete": "Delete selected",
 			"bulk.confirm": "Permanently delete these {count} archived conversations?",
+			"group.restore": "Restore the {count} conversations in this group",
+			"group.delete": "Delete the {count} conversations in this group",
+			"group.confirm": "Permanently delete the {count} conversations in this group?",
 			"toast.deleted": "Deleted \"{title}\"",
 			"toast.deletedMany": "Deleted {count} conversations",
 			"toast.deletedPartial": "Deleted {done}, {failed} failed",
@@ -627,6 +633,29 @@ window.__ModuleLoader__.load({
 	text-align: center;
 	font-variant-numeric: tabular-nums;
 }
+.dsh-am-group-actions {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	flex: none;
+	opacity: 0;
+	transition: opacity 120ms ease;
+}
+.dsh-am-group-head:hover .dsh-am-group-actions,
+.dsh-am-group-head:focus-within .dsh-am-group-actions { opacity: 1; }
+@media (hover: none) {
+	.dsh-am-group-actions { opacity: 1; }
+}
+.dsh-am-group-confirm {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: 1 1 auto;
+	min-width: 0;
+	font-size: 11px;
+	color: var(--dsw-alias-label-secondary, #5b6270);
+}
+.dsh-am-group-confirm .dsh-am-confirm-text { flex: 1 1 auto; }
 
 /* Rows ---------------------------------------------------------------- */
 .dsh-am-row {
@@ -867,7 +896,8 @@ window.__ModuleLoader__.load({
 	font-size: 11px;
 	color: var(--dsw-alias-label-tertiary, #7b8290);
 }
-.dsh-am-foot > span:last-child { margin-left: auto; font-variant-numeric: tabular-nums; }
+.dsh-am-foot-filtered { margin-left: auto; font-variant-numeric: tabular-nums; }
+.dsh-am-foot > .dsh-am-btn { flex: 0 0 auto; margin-left: 8px; }
 .dsh-am-foot-spinner { display: inline-flex; align-items: center; gap: 6px; }
 .dsh-am-toast {
 	position: absolute;
@@ -1077,6 +1107,7 @@ window.__ModuleLoader__.load({
 			const [confirming, setConfirming] = react.useState(null);
 			const [selected, setSelected] = react.useState(null);
 			const [bulkConfirm, setBulkConfirm] = react.useState(false);
+			const [groupConfirm, setGroupConfirm] = react.useState(null);
 			const dragRef = react.useRef(null);
 			const queryRef = react.useRef(null);
 			const toastSeq = react.useRef(0);
@@ -1126,6 +1157,7 @@ window.__ModuleLoader__.load({
 				setOpen(false);
 				setConfirming(null);
 				setBulkConfirm(false);
+				setGroupConfirm(null);
 				setSelected(null);
 			};
 
@@ -1208,19 +1240,23 @@ window.__ModuleLoader__.load({
 				setBulkConfirm(false);
 			};
 
-			/** Restore every ticked conversation, with the same progress reporting. */
-			const restoreSelected = async () => {
-				if (!selectedIds.length) return;
+			/**
+			 * Restore a list of ids one by one, reporting progress in the footer and
+			 * partial failures as a toast. Shared by "restore selected", the
+			 * per-group action and "restore all", so all three behave the same.
+			 * @returns true when the batch ran to completion (even with failures).
+			 */
+			const restoreIds = async (ids) => {
+				if (!ids.length) return false;
 				if (typeof props.restoreMany !== "function") {
 					notify("error", t("toast.unavailable"));
-					return;
+					return false;
 				}
-				const ids = selectedIds.slice();
 				setProgress({ done: 0, total: ids.length });
 				try {
 					await props.restoreMany(ids, (done, totalCount) => setProgress({ done, total: totalCount }));
 					notify("ok", t("toast.restoredMany", { count: ids.length }));
-					clearSelection();
+					return true;
 				} catch (error) {
 					const failures = error && Array.isArray(error.failures) ? error.failures : null;
 					if (failures && failures.length) {
@@ -1229,29 +1265,31 @@ window.__ModuleLoader__.load({
 							failures.length === ids.length ? "error" : "ok",
 							t("toast.partial", { done, failed: failures.length }) + " — " + reasonOf(failures[0].error),
 						);
-						clearSelection();
-					} else {
-						notify("error", t("toast.restoreFailed", { reason: reasonOf(error) }));
+						return true;
 					}
+					notify("error", t("toast.restoreFailed", { reason: reasonOf(error) }));
+					return false;
 				} finally {
 					setProgress(null);
 				}
 			};
 
-			/** Delete every ticked conversation, reporting partial failures. */
-			const deleteSelected = async () => {
-				if (!selectedIds.length) return;
+			/**
+			 * Delete a list of ids one by one, with the same progress reporting.
+			 * @returns true when the batch ran to completion (even with failures).
+			 */
+			const deleteIds = async (ids) => {
+				if (!ids.length) return false;
 				if (typeof props.deleteMany !== "function") {
 					notify("error", t("toast.deleteUnavailable"));
-					return;
+					return false;
 				}
-				const ids = selectedIds.slice();
 				setBulkConfirm(false);
 				setProgress({ done: 0, total: ids.length });
 				try {
 					await props.deleteMany(ids, (done, totalCount) => setProgress({ done, total: totalCount }));
 					notify("ok", t("toast.deletedMany", { count: ids.length }));
-					clearSelection();
+					return true;
 				} catch (error) {
 					const failures = error && Array.isArray(error.failures) ? error.failures : null;
 					if (failures && failures.length) {
@@ -1260,13 +1298,39 @@ window.__ModuleLoader__.load({
 							failures.length === ids.length ? "error" : "ok",
 							t("toast.deletedPartial", { done, failed: failures.length }) + " — " + reasonOf(failures[0].error),
 						);
-						clearSelection();
-					} else {
-						notify("error", t("toast.deleteFailed", { reason: reasonOf(error) }));
+						return true;
 					}
+					notify("error", t("toast.deleteFailed", { reason: reasonOf(error) }));
+					return false;
 				} finally {
 					setProgress(null);
 				}
+			};
+
+			/** Restore every ticked conversation. */
+			const restoreSelected = async () => {
+				if (!selectedIds.length) return;
+				if (await restoreIds(selectedIds.slice())) clearSelection();
+			};
+
+			/** Delete every ticked conversation, reporting partial failures. */
+			const deleteSelected = async () => {
+				if (!selectedIds.length) return;
+				if (await deleteIds(selectedIds.slice())) clearSelection();
+			};
+
+			/** Ids of a group's rows that are not mid-flight. */
+			const groupIds = (group) => group.rows.filter((row) => !busy(row.id)).map((row) => row.id);
+
+			/** Restore a whole workspace group in one go. */
+			const restoreGroup = async (group) => {
+				await restoreIds(groupIds(group));
+			};
+
+			/** Delete a whole workspace group, after the inline confirmation. */
+			const deleteGroup = async (group) => {
+				setGroupConfirm(null);
+				await deleteIds(groupIds(group));
 			};
 
 			const busy = (id) => Boolean(pending && pending[id]);
@@ -1307,31 +1371,7 @@ window.__ModuleLoader__.load({
 					notify("error", t("toast.unavailable"));
 					return;
 				}
-				const ids = [];
-				for (const group of visibleGroups) {
-					for (const row of group.rows) ids.push(row.id);
-				}
-				if (!ids.length) return;
-				setProgress({ done: 0, total: ids.length });
-				try {
-					await props.restoreMany(ids, (done, totalCount) => {
-						setProgress({ done, total: totalCount });
-					});
-					notify("ok", t("toast.restoredMany", { count: ids.length }));
-				} catch (error) {
-					const failures = error && Array.isArray(error.failures) ? error.failures : null;
-					if (failures && failures.length) {
-						const done = ids.length - failures.length;
-						notify(
-							failures.length === ids.length ? "error" : "ok",
-							t("toast.partial", { done, failed: failures.length }) + " — " + reasonOf(failures[0].error),
-						);
-					} else {
-						notify("error", t("toast.restoreFailed", { reason: reasonOf(error) }));
-					}
-				} finally {
-					setProgress(null);
-				}
+				await restoreIds(visibleIds.slice());
 			};
 
 			const revealRow = async (row) => {
@@ -1511,18 +1551,11 @@ window.__ModuleLoader__.load({
 					},
 					h(Icon, { name: "select" }),
 				),
-				h(
-					"button",
-					{
-						type: "button",
-						className: "dsh-am-icon-btn",
-						title: t("action.restoreAll"),
-						"aria-label": t("action.restoreAll"),
-						disabled: shown === 0 || progress !== null,
-						onClick: restoreVisible,
-					},
-					h(Icon, { name: "checkAll" }),
-				),
+				/*
+				 * "Restore all" deliberately does NOT live here: one gap away from the
+				 * close button it was too easy to hit by accident. It moved down into
+				 * the footer, far from the ✕, where it also carries a label.
+				 */
 				h(
 					"button",
 					{
@@ -1587,15 +1620,83 @@ window.__ModuleLoader__.load({
 					h("div", { className: "dsh-am-empty-hint" }, t("search.placeholder")),
 				);
 			} else {
-				body = visibleGroups.map((group) =>
-					h(
+				body = visibleGroups.map((group) => {
+					const confirmingGroup = groupConfirm === group.key;
+					return h(
 						"section",
 						{ className: "dsh-am-group", key: group.key },
 						h(
 							"div",
 							{ className: "dsh-am-group-head" },
-							h("span", { className: "dsh-am-group-title", title: group.path || group.title }, group.title),
-							h("span", { className: "dsh-am-group-count" }, String(group.rows.length)),
+							confirmingGroup
+								? h(
+										"div",
+										{ className: "dsh-am-group-confirm" },
+										h(Icon, { name: "trash", size: 12 }),
+										h(
+											"span",
+											{ className: "dsh-am-confirm-text" },
+											t("group.confirm", { count: group.rows.length }),
+										),
+										h(
+											"button",
+											{
+												type: "button",
+												className: "dsh-am-btn dsh-am-btn-danger",
+												onClick: () => deleteGroup(group),
+											},
+											t("delete.confirmYes"),
+										),
+										h(
+											"button",
+											{
+												type: "button",
+												className: "dsh-am-btn dsh-am-btn-ghost",
+												onClick: () => setGroupConfirm(null),
+											},
+											t("delete.confirmNo"),
+										),
+									)
+								: [
+										/*
+										 * Per-group actions, revealed on hover so the header stays
+										 * quiet: restore (harmless) and delete (asks in place).
+										 */
+										h(
+											"span",
+											{ className: "dsh-am-group-title", title: group.path || group.title, key: "title" },
+											group.title,
+										),
+										h("span", { className: "dsh-am-group-count", key: "count" }, String(group.rows.length)),
+										h(
+											"div",
+											{ className: "dsh-am-group-actions", key: "actions" },
+											h(
+												"button",
+												{
+													type: "button",
+													className: "dsh-am-icon-btn",
+													title: t("group.restore", { count: group.rows.length }),
+													"aria-label": t("group.restore", { count: group.rows.length }),
+													disabled: progress !== null || typeof props.restoreMany !== "function",
+													onClick: () => restoreGroup(group),
+												},
+												h(Icon, { name: "restore", size: 13 }),
+											),
+											h(
+												"button",
+												{
+													type: "button",
+													className: "dsh-am-icon-btn dsh-am-danger",
+													title: t("group.delete", { count: group.rows.length }),
+													"aria-label": t("group.delete", { count: group.rows.length }),
+													disabled: progress !== null || typeof props.deleteMany !== "function",
+													onClick: () => setGroupConfirm(group.key),
+												},
+												h(Icon, { name: "trash", size: 13 }),
+											),
+										),
+									],
 						),
 						group.rows.map((row) => {
 							const isBusy = busy(row.id);
@@ -1733,8 +1834,8 @@ window.__ModuleLoader__.load({
 								),
 							);
 						}),
-					),
 				);
+			});
 			}
 
 			/*
@@ -1835,11 +1936,29 @@ window.__ModuleLoader__.load({
 							h("span", null, t("progress.running", { done: progress.done, total: progress.total })),
 						)
 					: h("span", null, t("foot.hint", { total })),
-				progress
-					? null
-					: needle
-						? h("span", null, t("foot.filtered", { shown, total }))
-						: null,
+				h(
+					"span",
+					{ className: "dsh-am-foot-filtered" },
+					progress || !needle ? null : t("foot.filtered", { shown, total }),
+				),
+				/*
+				 * "Restore all" lives here rather than beside ✕. One gap away from the
+				 * close button it was too easy to hit by accident; at the bottom of the
+				 * panel it is far from the ✕ and carries a label as well.
+				 */
+				h(
+					"button",
+					{
+						type: "button",
+						className: "dsh-am-btn dsh-am-foot-restore",
+						title: t("action.restoreAll"),
+						"aria-label": t("action.restoreAll"),
+						disabled: shown === 0 || progress !== null,
+						onClick: restoreVisible,
+					},
+					h(Icon, { name: "checkAll", size: 12 }),
+					h("span", { className: "dsh-am-btn-label" }, t("action.restoreAll")),
+				),
 			);
 
 			const handles = ["n", "s", "e", "w", "nw", "ne", "sw", "se"].map((side) =>

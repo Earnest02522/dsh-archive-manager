@@ -896,6 +896,90 @@ async function main() {
 	check("select all toggles back off", findAll(allView.tree, byClass("dsh-am-bulk")).length === 0);
 	allView.dispose();
 
+	console.log("\n# per-group actions");
+	const groupSnapshot = {
+		items: [
+			{
+				workspaceId: "ws-a",
+				title: "Alpha project",
+				path: "D:\\work\\alpha",
+				sessionIds: ["s-alpha-1", "s-alpha-2", "s-live"],
+				createdAt: "",
+				updatedAt: "",
+			},
+		],
+		archivedSessionIds: ["s-alpha-1", "s-alpha-2"],
+	};
+	const groupHarness = makeContext({ workspaces: groupSnapshot });
+	exports.apply(groupHarness.ctx);
+	const groupRegistration = groupHarness.registrations[0];
+	const groupProps = groupRegistration.options.inject();
+	const groupView = mount(groupRegistration.Component, () => propsFor(groupRegistration, { wide: true }));
+	findAll(groupView.tree, byClass("dsh-am-trigger"))[0].props.onClick();
+	const groupHead = findAll(groupView.tree, byClass("dsh-am-group-head"))[0];
+	const groupActions = findAll(groupHead, byClass("dsh-am-group-actions"))[0];
+	check("group actions rendered", Boolean(groupActions));
+	equal("group offers restore and delete", findAll(groupActions, byClass("dsh-am-icon-btn")).length, 2);
+	const groupRestoreLabel = groupProps.t("group.restore", { count: 2 });
+	const groupDeleteLabel = groupProps.t("group.delete", { count: 2 });
+	check("group restore is labelled with its size", Boolean(findAll(groupHead, byLabel(groupRestoreLabel))[0]));
+	check("group delete is labelled with its size", Boolean(findAll(groupHead, byLabel(groupDeleteLabel))[0]));
+	await findAll(groupHead, byLabel(groupRestoreLabel))[0].props.onClick();
+	equal("only the group is restored", groupHarness.calls.unarchive.join(","), "s-alpha-1,s-alpha-2");
+	check(
+		"group restore toast",
+		textOf(findAll(groupView.tree, byClass("dsh-am-toast"))[0]).indexOf("已恢复 2 个会话") !== -1,
+	);
+	equal("restored group leaves no rows", findAll(groupView.tree, byClass("dsh-am-row")).length, 0);
+	groupView.dispose();
+
+	console.log("\n# per-group delete asks in place");
+	const groupDeleteHarness = makeContext({ workspaces: groupSnapshot });
+	exports.apply(groupDeleteHarness.ctx);
+	const groupDeleteRegistration = groupDeleteHarness.registrations[0];
+	const groupDeleteProps = groupDeleteRegistration.options.inject();
+	const groupDeleteView = mount(groupDeleteRegistration.Component, () => propsFor(groupDeleteRegistration, { wide: true }));
+	findAll(groupDeleteView.tree, byClass("dsh-am-trigger"))[0].props.onClick();
+	findAll(groupDeleteView.tree, byLabel(groupDeleteProps.t("group.delete", { count: 2 })))[0].props.onClick();
+	const groupStrip = findAll(groupDeleteView.tree, byClass("dsh-am-group-confirm"))[0];
+	check("the group asks in place", Boolean(groupStrip));
+	check(
+		"the group question names the count",
+		textOf(groupStrip).indexOf("永久删除该组的 2 个会话") !== -1,
+		textOf(groupStrip),
+	);
+	equal("nothing deleted before confirming", groupDeleteHarness.calls.deleted.length, 0);
+	equal("rows stay listed while asking", findAll(groupDeleteView.tree, byClass("dsh-am-row")).length, 2);
+	findAll(groupStrip, byClass("dsh-am-btn"))[1].props.onClick();
+	equal("cancel restores the group head", findAll(groupDeleteView.tree, byClass("dsh-am-group-confirm")).length, 0);
+	equal("cancel deletes nothing", groupDeleteHarness.calls.deleted.length, 0);
+	findAll(groupDeleteView.tree, byLabel(groupDeleteProps.t("group.delete", { count: 2 })))[0].props.onClick();
+	const groupConfirmAgain = findAll(groupDeleteView.tree, byClass("dsh-am-group-confirm"))[0];
+	await findAll(groupConfirmAgain, byClass("dsh-am-btn-danger"))[0].props.onClick();
+	equal("the whole group is deleted", groupDeleteHarness.calls.deleted.slice().sort().join(","), "s-alpha-1,s-alpha-2");
+	check(
+		"group delete toast",
+		textOf(findAll(groupDeleteView.tree, byClass("dsh-am-toast"))[0]).indexOf("已删除 2 个会话") !== -1,
+	);
+	equal("deleted group leaves no rows", findAll(groupDeleteView.tree, byClass("dsh-am-row")).length, 0);
+	groupDeleteView.dispose();
+
+	console.log("\n# restore all sits away from the close button");
+	const awayFromClose = mount(registration.Component, () => propsFor(registration, { wide: true }));
+	findAll(awayFromClose.tree, byClass("dsh-am-trigger"))[0].props.onClick();
+	const headerRegion = findAll(awayFromClose.tree, byClass("dsh-am-head"))[0];
+	equal(
+		"the header no longer offers restore-all",
+		findAll(headerRegion, byLabel(injectedProps.t("action.restoreAll"))).length,
+		0,
+	);
+	const footerRegion = findAll(awayFromClose.tree, byClass("dsh-am-foot"))[0];
+	check(
+		"restore-all moved to the footer",
+		Boolean(findAll(footerRegion, byLabel(injectedProps.t("action.restoreAll")))[0]),
+	);
+	awayFromClose.dispose();
+
 	console.log("\n# click away collapses the panel");
 	const awayHarness = makeContext();
 	exports.apply(awayHarness.ctx);
