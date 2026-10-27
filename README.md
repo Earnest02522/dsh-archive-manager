@@ -85,6 +85,10 @@ or jump to the folder the conversation belongs to.
   stretch button in the panel header swaps it for a full-width row that lines up
   with the conversations above it. The choice is remembered per browser, and the
   collapsed rail stays a single square icon either way.
+- **Comfortable targets** — the workspace heading is a full-width 34px-tall
+  toggle, the four row actions are 30px squares with 16px glyphs, rows are 50px
+  tall, and the panel now opens at 456×552 (minimum 344×280) so the controls are
+  not crammed against the text.
 - **i18n** — Chinese and English UI text, picked from the DSH locale first and
   the browser language second.
 - **Client-side UI, one Host Remote** — the panel is plain ESM served straight
@@ -274,7 +278,7 @@ node test/client.test.mjs
 `node test/client.test.mjs` runs `test/client.test.mjs`, a dependency-free
 harness with a hand-written mini React runtime that stubs
 `window.__ModuleLoader__`, `document` and `navigator`, applies the plugin to a
-fake `ctx`, and asserts 198 behaviours: the load contract, slot registration
+fake `ctx`, and asserts 201 behaviours: the load contract, slot registration
 (`name` / `id` / `order` / `locale`), Chinese fallback translation, grouping
 (3 workspaces → 3 groups), search filtering, single restore (service call +
 toast + reactive row removal), restore-and-open, bulk restore, reveal request
@@ -287,7 +291,8 @@ and only that group is touched), restore-all and delete-all living in the footer
 instead of beside the ✕, folding a group (rows hide, the receipt counts them,
 other groups keep theirs, unfolding restores them), click-away dismissal,
 the entry-width preference (compact by default, remembered once switched, the
-collapsed rail staying square),
+collapsed rail staying square), the target sizes (30px action squares, a 34px
+group toggle, 50px rows),
 refused deletion while a conversation is
 running, degraded mode without `unarchiveSession` or without a remote gateway,
 empty-archive and narrow-sidebar rendering, drag/resize geometry math, `Esc`

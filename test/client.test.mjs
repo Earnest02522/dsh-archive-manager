@@ -1142,6 +1142,9 @@ async function main() {
 	);
 	check("entry width is a stored preference", /STYLE_KEY = NS \+ "\/trigger-style"/.test(source));
 	check("the preference defaults to compact", /=== "wide" \? "wide" : "compact"/.test(source));
+	check("action targets are 30px squares", /\.dsh-am-icon-btn\s*\{[^}]*width: 30px/.test(source));
+	check("the group heading is a tall target", /\.dsh-am-group-toggle\s*\{[^}]*min-height: 34px/.test(source));
+	check("rows leave room around the controls", /\.dsh-am-row\s*\{[^}]*min-height: 50px/.test(source));
 
 	console.log("\n# host surface");
 	const hostSource = readFileSync(new URL("../src/index.js", import.meta.url), "utf8");

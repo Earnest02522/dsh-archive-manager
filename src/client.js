@@ -37,10 +37,10 @@ window.__ModuleLoader__.load({
 		/** Where the sidebar-entry width preference is remembered. */
 		const STYLE_KEY = NS + "/trigger-style";
 
-		const MIN_WIDTH = 320;
-		const MIN_HEIGHT = 264;
-		const DEFAULT_WIDTH = 424;
-		const DEFAULT_HEIGHT = 528;
+		const MIN_WIDTH = 344;
+		const MIN_HEIGHT = 280;
+		const DEFAULT_WIDTH = 456;
+		const DEFAULT_HEIGHT = 552;
 		const MARGIN = 8;
 
 		const zh = {
@@ -625,11 +625,11 @@ window.__ModuleLoader__.load({
 	align-items: center;
 	justify-content: center;
 	flex: none;
-	width: 26px;
-	height: 26px;
+	width: 30px;
+	height: 30px;
 	padding: 0;
 	border: 0;
-	border-radius: var(--dsw-radius-sm, 6px);
+	border-radius: var(--dsw-radius-md, 8px);
 	background: transparent;
 	color: var(--dsw-alias-label-secondary, #5b6270);
 	cursor: pointer;
@@ -749,20 +749,21 @@ window.__ModuleLoader__.load({
 	z-index: 1;
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	padding: 7px 6px 4px;
+	gap: 4px;
+	padding: 5px 4px 3px;
 	background: var(--dsw-alias-bg-layer-2, #fff);
 }
 /* The heading itself is the collapse toggle: one wide target, no tiny ✕. */
 .dsh-am-group-toggle {
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: 8px;
 	flex: 1 1 auto;
 	min-width: 0;
-	padding: 2px 4px;
+	min-height: 34px;
+	padding: 6px 8px;
 	border: 0;
-	border-radius: var(--dsw-radius-sm, 6px);
+	border-radius: var(--dsw-radius-md, 8px);
 	background: transparent;
 	color: inherit;
 	font: inherit;
@@ -792,9 +793,9 @@ window.__ModuleLoader__.load({
 .dsh-am-group-title {
 	flex: 1 1 auto;
 	min-width: 0;
-	font-size: 10.5px;
+	font-size: 11px;
 	font-weight: 600;
-	letter-spacing: 0.07em;
+	letter-spacing: 0.06em;
 	text-transform: uppercase;
 	color: var(--dsw-alias-label-tertiary, #7b8290);
 	white-space: nowrap;
@@ -803,20 +804,20 @@ window.__ModuleLoader__.load({
 }
 .dsh-am-group-count {
 	flex: none;
-	min-width: 16px;
-	padding: 0 5px;
+	min-width: 18px;
+	padding: 0 6px;
 	border-radius: 999px;
 	background: var(--dsh-am-accent-soft, var(--dsw-alias-bg-layer-3, rgba(127, 127, 127, 0.1)));
 	color: var(--dsh-am-accent, var(--dsw-alias-label-caption, #9aa1ad));
-	font-size: 10.5px;
+	font-size: 11px;
 	font-weight: 600;
-	line-height: 16px;
+	line-height: 18px;
 	text-align: center;
 	font-variant-numeric: tabular-nums;
 }
 /* Folded group: keep the heading, drop the rows, leave a one-line receipt. */
 .dsh-am-group-collapsed {
-	padding: 1px 8px 3px 25px;
+	padding: 2px 8px 4px 28px;
 	font-size: 11px;
 	color: var(--dsw-alias-label-tertiary, #7b8290);
 }
@@ -825,6 +826,7 @@ window.__ModuleLoader__.load({
 	align-items: center;
 	gap: 2px;
 	flex: none;
+	padding-right: 2px;
 	opacity: 0;
 	transition: opacity 120ms ease;
 }
@@ -849,8 +851,8 @@ window.__ModuleLoader__.load({
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	min-height: 44px;
-	padding: 5px 6px 5px 4px;
+	min-height: 50px;
+	padding: 6px 8px 6px 6px;
 	border-radius: var(--dsw-radius-md, 8px);
 	position: relative;
 	transition: background-color 120ms ease, box-shadow 120ms ease;
@@ -866,11 +868,11 @@ window.__ModuleLoader__.load({
 	align-items: center;
 	justify-content: center;
 	flex: none;
-	width: 18px;
-	height: 18px;
+	width: 20px;
+	height: 20px;
 	padding: 0;
 	border: 1.5px solid var(--dsw-alias-border-l3, rgba(127, 127, 127, 0.45));
-	border-radius: 5px;
+	border-radius: 6px;
 	background: transparent;
 	color: transparent;
 	cursor: pointer;
@@ -921,7 +923,7 @@ window.__ModuleLoader__.load({
 .dsh-am-row-actions {
 	display: flex;
 	align-items: center;
-	gap: 1px;
+	gap: 2px;
 	opacity: 0;
 	transform: translateX(2px);
 	transition: opacity 120ms ease, transform 120ms ease;
@@ -969,16 +971,16 @@ window.__ModuleLoader__.load({
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	gap: 4px;
+	gap: 5px;
 	flex: none;
-	height: 24px;
-	padding: 0 9px;
+	height: 28px;
+	padding: 0 12px;
 	border: 1px solid var(--dsw-alias-border-l2, rgba(127, 127, 127, 0.28));
-	border-radius: var(--dsw-radius-sm, 6px);
+	border-radius: var(--dsw-radius-md, 8px);
 	background: var(--dsw-alias-bg-layer-1, rgba(127, 127, 127, 0.06));
 	color: var(--dsw-alias-label-primary, #1f2430);
 	font: inherit;
-	font-size: 11.5px;
+	font-size: 12px;
 	line-height: 1;
 	white-space: nowrap;
 	cursor: pointer;
@@ -1848,7 +1850,7 @@ window.__ModuleLoader__.load({
 				h(
 					"div",
 					{ className: "dsh-am-search" },
-					h(Icon, { name: "search", size: 13 }),
+					h(Icon, { name: "search", size: 14 }),
 					h("input", {
 						ref: queryRef,
 						className: "dsh-am-input",
@@ -1869,7 +1871,7 @@ window.__ModuleLoader__.load({
 									"aria-label": t("search.clear"),
 									onClick: () => setQuery(""),
 								},
-								h(Icon, { name: "close", size: 11 }),
+								h(Icon, { name: "close", size: 13 }),
 							)
 						: null,
 				),
@@ -1911,7 +1913,7 @@ window.__ModuleLoader__.load({
 								? h(
 										"div",
 										{ className: "dsh-am-group-confirm" },
-										h(Icon, { name: "trash", size: 12 }),
+										h(Icon, { name: "trash", size: 13 }),
 										h(
 											"span",
 											{ className: "dsh-am-confirm-text" },
@@ -1953,7 +1955,7 @@ window.__ModuleLoader__.load({
 												"aria-expanded": isCollapsed ? "false" : "true",
 												onClick: () => toggleGroup(group.key),
 											},
-											h("span", { className: "dsh-am-group-chevron" }, h(Icon, { name: "chevron", size: 11 })),
+											h("span", { className: "dsh-am-group-chevron" }, h(Icon, { name: "chevron", size: 12 })),
 											h("span", { className: "dsh-am-group-accent" }),
 											h(
 												"span",
@@ -1980,7 +1982,7 @@ window.__ModuleLoader__.load({
 													disabled: progress !== null || typeof props.restoreMany !== "function",
 													onClick: () => restoreGroup(group),
 												},
-												h(Icon, { name: "restore", size: 13 }),
+												h(Icon, { name: "restore", size: 15 }),
 											),
 											h(
 												"button",
@@ -1992,7 +1994,7 @@ window.__ModuleLoader__.load({
 													disabled: progress !== null || typeof props.deleteMany !== "function",
 													onClick: () => setGroupConfirm(group.key),
 												},
-												h(Icon, { name: "trash", size: 13 }),
+												h(Icon, { name: "trash", size: 15 }),
 											),
 										),
 									),
@@ -2013,7 +2015,7 @@ window.__ModuleLoader__.load({
 								 * The confirmation takes over the row instead of opening a
 								 * strip underneath it: the panel height stays put, the eye
 								 * does not have to travel, and there is no second target to
-								 * hit. Same height as a normal row (44px).
+								 * hit. Same height as a normal row (50px).
 								 */
 								return h(
 									"div",
@@ -2025,7 +2027,7 @@ window.__ModuleLoader__.load({
 									h(
 										"div",
 										{ className: "dsh-am-confirm" },
-										h("span", { className: "dsh-am-confirm-icon" }, h(Icon, { name: "trash", size: 14 })),
+										h("span", { className: "dsh-am-confirm-icon" }, h(Icon, { name: "trash", size: 16 })),
 										h("span", { className: "dsh-am-confirm-text", title: row.title }, t("delete.confirmShort", { title: ellipsis(row.title, 40) })),
 										h(
 											"button",
@@ -2067,7 +2069,7 @@ window.__ModuleLoader__.load({
 										disabled: isBusy || progress !== null,
 										onClick: () => toggleSelect(row.id),
 									},
-									isSelected ? h(Icon, { name: "check", size: 11 }) : null,
+									isSelected ? h(Icon, { name: "check", size: 12 }) : null,
 								),
 								h(
 									"div",
@@ -2097,7 +2099,7 @@ window.__ModuleLoader__.load({
 											disabled: isBusy || progress !== null,
 											onClick: () => restoreOne(row, true),
 										},
-										h(Icon, { name: "open", size: 14 }),
+										h(Icon, { name: "open", size: 16 }),
 									),
 									h(
 										"button",
@@ -2109,7 +2111,7 @@ window.__ModuleLoader__.load({
 											disabled: isBusy || progress !== null,
 											onClick: () => restoreOne(row, false),
 										},
-										h(Icon, { name: "restore", size: 14 }),
+										h(Icon, { name: "restore", size: 16 }),
 									),
 									row.cwd
 										? h(
@@ -2122,7 +2124,7 @@ window.__ModuleLoader__.load({
 													disabled: isBusy,
 													onClick: () => revealRow(row),
 												},
-												h(Icon, { name: "folder", size: 14 }),
+												h(Icon, { name: "folder", size: 16 }),
 											)
 										: null,
 									h(
@@ -2135,7 +2137,7 @@ window.__ModuleLoader__.load({
 											disabled: isBusy || progress !== null || typeof props.deleteSession !== "function",
 											onClick: () => setConfirming(row.id),
 										},
-										h(Icon, { name: "trash", size: 14 }),
+										h(Icon, { name: "trash", size: 16 }),
 									),
 								),
 							);
@@ -2212,7 +2214,7 @@ window.__ModuleLoader__.load({
 													disabled: progress !== null || typeof props.deleteMany !== "function",
 													onClick: () => setBulkConfirm(true),
 												},
-												h(Icon, { name: "trash", size: 12 }),
+												h(Icon, { name: "trash", size: 13 }),
 												h("span", { className: "dsh-am-btn-label" }, t("bulk.delete")),
 											),
 											h(
@@ -2224,7 +2226,7 @@ window.__ModuleLoader__.load({
 													"aria-label": t("action.clearSelection"),
 													onClick: clearSelection,
 												},
-												h(Icon, { name: "close", size: 12 }),
+												h(Icon, { name: "close", size: 13 }),
 											),
 										),
 									),
@@ -2245,7 +2247,7 @@ window.__ModuleLoader__.load({
 						? h(
 								"div",
 								{ className: "dsh-am-foot-confirm" },
-								h(Icon, { name: "trash", size: 12 }),
+								h(Icon, { name: "trash", size: 13 }),
 								h("span", { className: "dsh-am-confirm-text" }, t("deleteAll.confirm", { count: shown })),
 							)
 						: h("span", null, t("foot.hint", { total })),
@@ -2311,7 +2313,7 @@ window.__ModuleLoader__.load({
 									shown === 0 || progress !== null || typeof props.deleteMany !== "function",
 								onClick: () => setFooterConfirm(true),
 							},
-							h(Icon, { name: "trash", size: 12 }),
+							h(Icon, { name: "trash", size: 13 }),
 							h("span", { className: "dsh-am-btn-label" }, t("action.deleteAll")),
 						),
 			);
