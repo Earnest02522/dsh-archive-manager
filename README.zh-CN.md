@@ -21,7 +21,7 @@
 
 ## 功能
 
-- **归档总览（按工作区分组）**：点击侧边栏底部（`sidebar.footer.action` 插槽）的**通栏**按钮——它占满侧边栏宽度，与上方各行对齐，条数徽标贴在最右端——弹出面板。
+- **归档总览（按工作区分组）**：点击侧边栏底部（`sidebar.footer.action` 插槽）的按钮弹出面板。
   每个归档会话显示在其所属工作区标题下（没有工作区认领的归入「未分组」），按更新时间倒序，
   每行展示标题、短会话 id、相对时间与工作目录。
 - **恢复**：调用 DSH 自带的 `workspaces.unarchiveSession(...)`，因此侧边栏、工作区记账与持久化层保持一致。
@@ -197,7 +197,7 @@ node test/client.test.mjs
 ```
 
 `node test/client.test.mjs` 运行一个零依赖的手写迷你 React 运行时，
-桩掉 `window.__ModuleLoader__` / `document` / `navigator`，把插件 apply 到伪造的 `ctx` 上，断言 189 项行为：
+桩掉 `window.__ModuleLoader__` / `document` / `navigator`，把插件 apply 到伪造的 `ctx` 上，断言 184 项行为：
 加载契约、插槽注册（`name` / `id` / `order` / `locale`）、中文回退翻译、分组（3 个工作区 → 3 组）、
 搜索过滤、单条恢复（服务调用 + toast + 响应式移除行）、恢复并打开、批量恢复、定位目录的请求体、
 **行内**删除确认（行数不变、面板高度不变、确认前一条都不删、描述符带上网关要求的 strict codec、

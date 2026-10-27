@@ -31,9 +31,8 @@ or jump to the folder the conversation belongs to.
 ## Features
 
 - **Archived overview, grouped by workspace** — popup panel opened from a
-  full-width button at the bottom of the sidebar (`sidebar.footer.action`) that
-  lines up with the rows above it; the count badge sits at its far edge. Every
-  archived conversation is listed under its workspace heading (sessions that no
+  button at the bottom of the sidebar (`sidebar.footer.action`). Every archived
+  conversation is listed under its workspace heading (sessions that no
   workspace claims fall into *Ungrouped*), newest first, with title, short
   session id, relative time and working directory.
 - **Restore** — removes the session from the archive set through DSH's own
@@ -271,7 +270,7 @@ node test/client.test.mjs
 `node test/client.test.mjs` runs `test/client.test.mjs`, a dependency-free
 harness with a hand-written mini React runtime that stubs
 `window.__ModuleLoader__`, `document` and `navigator`, applies the plugin to a
-fake `ctx`, and asserts 189 behaviours: the load contract, slot registration
+fake `ctx`, and asserts 184 behaviours: the load contract, slot registration
 (`name` / `id` / `order` / `locale`), Chinese fallback translation, grouping
 (3 workspaces → 3 groups), search filtering, single restore (service call +
 toast + reactive row removal), restore-and-open, bulk restore, reveal request
