@@ -895,6 +895,51 @@ async function main() {
 	equal("only the ungrouped row left", findAll(selectView.tree, byClass("dsh-am-row")).length, 1);
 	selectView.dispose();
 
+	console.log("\n# the whole row is a selection target");
+	const barHarness = makeContext();
+	exports.apply(barHarness.ctx);
+	const barRegistration = barHarness.registrations[0];
+	const barProps = barRegistration.options.inject();
+	const barView = mount(barRegistration.Component, () => propsFor(barRegistration, { wide: true }));
+	const clickInside = { closest: () => null };
+	const clickButton = { closest: () => ({ tagName: "BUTTON" }) };
+	findAll(barView.tree, byClass("dsh-am-trigger"))[0].props.onClick();
+	findAll(barView.tree, byClass("dsh-am-row"))[0].props.onClick({ target: clickInside });
+	equal(
+		"clicking the row title area selects it",
+		findAll(barView.tree, byClass("dsh-am-row"))[0].props["data-selected"],
+		"true",
+	);
+	equal(
+		"the tick box follows the row click",
+		findAll(barView.tree, byClass("dsh-am-check"))[0].props["aria-checked"],
+		"true",
+	);
+	equal(
+		"the panel flags an active selection",
+		findAll(barView.tree, byClass("dsh-am-panel"))[0].props["data-selecting"],
+		"true",
+	);
+	findAll(barView.tree, byClass("dsh-am-row"))[0].props.onClick({ target: clickInside });
+	check(
+		"clicking the same row again clears it",
+		findAll(barView.tree, byClass("dsh-am-row"))[0].props["data-selected"] === undefined,
+	);
+	check(
+		"the panel drops the selecting flag",
+		findAll(barView.tree, byClass("dsh-am-panel"))[0].props["data-selecting"] === undefined,
+	);
+	findAll(barView.tree, byClass("dsh-am-row"))[0].props.onClick({ target: clickButton });
+	check(
+		"clicks that land on a button do not toggle",
+		findAll(barView.tree, byClass("dsh-am-row"))[0].props["data-selected"] === undefined,
+	);
+	findAll(barView.tree, byClass("dsh-am-row"))[0].props.onClick({ target: clickInside });
+	check("the footer explains the gesture", textOf(barView.tree).indexOf("点条目即可多选") !== -1);
+	await findAll(barView.tree, byLabel(barProps.t("action.restore")))[0].props.onClick();
+	equal("action buttons still run instead of selecting", barHarness.calls.unarchive.join(","), "s-alpha-1");
+	barView.dispose();
+
 	console.log("\n# multi-select delete");
 	const bulkDeleteHarness = makeContext();
 	exports.apply(bulkDeleteHarness.ctx);
@@ -1145,6 +1190,8 @@ async function main() {
 	check("action targets are 30px squares", /\.dsh-am-icon-btn\s*\{[^}]*width: 30px/.test(source));
 	check("the group heading is a tall target", /\.dsh-am-group-toggle\s*\{[^}]*min-height: 34px/.test(source));
 	check("rows leave room around the controls", /\.dsh-am-row\s*\{[^}]*min-height: 50px/.test(source));
+	check("the row bar is the selection target", /\.dsh-am-row-main\s*\{[^}]*cursor: pointer/.test(source));
+	check("tick boxes stay visible while selecting", /\.dsh-am-panel\[data-selecting="true"\] \.dsh-am-check/.test(source));
 
 	console.log("\n# host surface");
 	const hostSource = readFileSync(new URL("../src/index.js", import.meta.url), "utf8");

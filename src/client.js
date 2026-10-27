@@ -97,7 +97,7 @@ window.__ModuleLoader__.load({
 			"toast.openMissing": "已恢复，请从侧边栏打开会话",
 			"toast.unavailable": "当前 DSH 版本没有提供恢复归档的接口",
 			"progress.running": "正在处理 {done}/{total}",
-			"foot.hint": "共 {total} 个归档会话",
+			"foot.hint": "共 {total} 个归档会话 · 点条目即可多选",
 			"foot.filtered": "{shown} / {total}",
 			"time.now": "刚刚",
 			"time.minutes": "{n} 分钟前",
@@ -159,7 +159,7 @@ window.__ModuleLoader__.load({
 			"toast.openMissing": "Restored — open it from the sidebar",
 			"toast.unavailable": "This DSH version exposes no unarchive API",
 			"progress.running": "Working {done}/{total}",
-			"foot.hint": "{total} archived conversations",
+			"foot.hint": "{total} archived conversations · click a row to select",
 			"foot.filtered": "{shown} / {total}",
 			"time.now": "just now",
 			"time.minutes": "{n}m ago",
@@ -893,7 +893,9 @@ window.__ModuleLoader__.load({
 	outline-offset: 1px;
 }
 @media (hover: none) { .dsh-am-check { opacity: 1; } }
-.dsh-am-row-main { flex: 1 1 auto; min-width: 0; }
+/* While a selection exists, keep every tick box visible: the next row is one click away. */
+.dsh-am-panel[data-selecting="true"] .dsh-am-check { opacity: 1; }
+.dsh-am-row-main { flex: 1 1 auto; min-width: 0; cursor: pointer; }
 .dsh-am-row-title {
 	font-size: 13px;
 	font-weight: 500;
@@ -1469,6 +1471,19 @@ window.__ModuleLoader__.load({
 					return Object.keys(next).length ? next : null;
 				});
 				setBulkConfirm(false);
+			};
+
+			/**
+			 * A click anywhere on the row bar is the selection gesture: the tick box
+			 * is 20px and sits on the far left, so making it the only target forced a
+			 * trip across the panel for every entry. Buttons inside the row (the four
+			 * actions, the confirm pair) keep their own behaviour and are skipped.
+			 */
+			const toggleRowSelection = (event, row) => {
+				if (progress !== null || busy(row.id)) return;
+				const target = event && event.target;
+				if (target && typeof target.closest === "function" && target.closest("button, input, textarea, a, select")) return;
+				toggleSelect(row.id);
 			};
 
 			/** Drop the whole selection. */
@@ -2057,6 +2072,7 @@ window.__ModuleLoader__.load({
 									key: row.id,
 									"data-busy": isBusy ? "true" : undefined,
 									"data-selected": isSelected ? "true" : undefined,
+									onClick: (event) => toggleRowSelection(event, row),
 								},
 								h(
 									"button",
@@ -2341,6 +2357,7 @@ window.__ModuleLoader__.load({
 						role: "dialog",
 						"aria-label": t("panel.title"),
 						"data-dsh-am": "panel",
+						"data-selecting": selectedCount > 0 ? "true" : undefined,
 						style: panelStyle,
 					},
 					header,

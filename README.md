@@ -52,11 +52,14 @@ or jump to the folder the conversation belongs to.
   (blue open, green restore, amber reveal, red delete), and the bulk bar and
   empty-state tile are tinted brand surfaces. All colours derive from
   `--dsw-alias-*` tokens, so they follow the active theme.
-- **Multi-select** — every row carries a checkbox that appears on hover (always
-  visible on touch); a bulk bar then offers *Restore selected*, *Delete
-  selected* and *Clear*, and the header toggles *Select all* over the visible
-  rows. The selection is pruned against the live archive set, so a batch can
-  never act on a row that has already gone.
+- **Multi-select** — every row is a selection target: clicking anywhere on the
+  row bar ticks it, and the checkbox on the left is just the visual cue (it
+  appears on hover, stays visible while a selection exists, and is always shown
+  on touch). A bulk bar then offers *Restore selected*, *Delete selected* and
+  *Clear*, and the header toggles *Select all* over the visible rows. Clicks that
+  land on one of the row actions still run that action instead of selecting. The
+  selection is pruned against the live archive set, so a batch can never act on a
+  row that has already gone.
 - **Collapsible workspace groups** — the workspace heading itself is the fold
   toggle (chevron, accent dot, title, count). Folding hides that group's rows and
   leaves a one-line receipt (`3 hidden`); it is purely visual, so folded rows stay
@@ -278,7 +281,7 @@ node test/client.test.mjs
 `node test/client.test.mjs` runs `test/client.test.mjs`, a dependency-free
 harness with a hand-written mini React runtime that stubs
 `window.__ModuleLoader__`, `document` and `navigator`, applies the plugin to a
-fake `ctx`, and asserts 201 behaviours: the load contract, slot registration
+fake `ctx`, and asserts 211 behaviours: the load contract, slot registration
 (`name` / `id` / `order` / `locale`), Chinese fallback translation, grouping
 (3 workspaces → 3 groups), search filtering, single restore (service call +
 toast + reactive row removal), restore-and-open, bulk restore, reveal request
@@ -286,7 +289,8 @@ payload, the row-inline delete confirmation (the row keeps its place and the
 panel keeps its geometry, nothing is deleted before you confirm, the descriptor
 carries the strict codecs the gateway requires, the mount is reused, the archive
 snapshot is re-synced afterwards), multi-select restore and delete, *Select
-all*, per-workspace restore and delete (the group asks inside its own heading
+all*, selecting by clicking the row bar (and clicks on an action button *not*
+selecting while they still run the action), per-workspace restore and delete (the group asks inside its own heading
 and only that group is touched), restore-all and delete-all living in the footer
 instead of beside the ✕, folding a group (rows hide, the receipt counts them,
 other groups keep theirs, unfolding restores them), click-away dismissal,
