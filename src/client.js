@@ -52,6 +52,8 @@ window.__ModuleLoader__.load({
 			"action.restoreOpen": "恢复并打开",
 			"action.reveal": "在文件管理器中显示工作目录",
 			"action.restoreAll": "全部恢复",
+			"action.deleteAll": "全部删除",
+			"deleteAll.confirm": "永久删除全部 {count} 个归档会话？",
 			"action.delete": "删除归档会话",
 			"action.select": "选择该会话",
 			"action.selectAll": "全选",
@@ -69,6 +71,9 @@ window.__ModuleLoader__.load({
 			"group.restore": "恢复该组的 {count} 个会话",
 			"group.delete": "删除该组的 {count} 个会话",
 			"group.confirm": "永久删除该组的 {count} 个会话？",
+			"group.collapse": "收起该组",
+			"group.expand": "展开该组",
+			"group.collapsed": "已收起 {count} 个",
 			"toast.deleted": "已删除「{title}」",
 			"toast.deletedMany": "已删除 {count} 个会话",
 			"toast.deletedPartial": "已删除 {done} 个，{failed} 个失败",
@@ -107,6 +112,8 @@ window.__ModuleLoader__.load({
 			"action.restoreOpen": "Restore and open",
 			"action.reveal": "Reveal working folder",
 			"action.restoreAll": "Restore all",
+			"action.deleteAll": "Delete all",
+			"deleteAll.confirm": "Permanently delete all {count} archived conversations?",
 			"action.delete": "Delete archived conversation",
 			"action.select": "Select this conversation",
 			"action.selectAll": "Select all",
@@ -124,6 +131,9 @@ window.__ModuleLoader__.load({
 			"group.restore": "Restore the {count} conversations in this group",
 			"group.delete": "Delete the {count} conversations in this group",
 			"group.confirm": "Permanently delete the {count} conversations in this group?",
+			"group.collapse": "Collapse this group",
+			"group.expand": "Expand this group",
+			"group.collapsed": "{count} hidden",
 			"toast.deleted": "Deleted \"{title}\"",
 			"toast.deletedMany": "Deleted {count} conversations",
 			"toast.deletedPartial": "Deleted {done}, {failed} failed",
@@ -253,6 +263,47 @@ window.__ModuleLoader__.load({
 			return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate());
 		}
 
+		/**
+		 * Per-group accent colours.
+		 *
+		 * The panel used to be entirely grey, which made a long archive look like
+		 * one block. Each workspace now gets a stable hue derived from its id, so
+		 * groups are told apart by colour as well as by heading — and the hue does
+		 * not jump around when sessions are restored or deleted (it depends on the
+		 * key only, never on position).
+		 */
+		const ACCENTS = [
+			"#5b8def",
+			"#2f9e6e",
+			"#c1802f",
+			"#9469d6",
+			"#2f9fc4",
+			"#d15b56",
+			"#3aa79b",
+			"#b5892f",
+		];
+
+		/** Stable accent for a group key (`@ungrouped` gets the neutral slate). */
+		function accentOf(key) {
+			const text = String(key === undefined || key === null ? "" : key);
+			if (text === "@ungrouped") return "#7b8290";
+			let hash = 0;
+			for (let index = 0; index < text.length; index += 1) {
+				hash = (hash * 31 + text.charCodeAt(index)) >>> 0;
+			}
+			return ACCENTS[hash % ACCENTS.length];
+		}
+
+		/** Inline custom properties consumed by the stylesheet for one group. */
+		function accentStyle(key) {
+			const color = accentOf(key);
+			return {
+				"--dsh-am-accent": color,
+				"--dsh-am-accent-soft": color + "1f",
+				"--dsh-am-accent-line": color + "59",
+			};
+		}
+
 		/** Extract a printable message from anything thrown by a Remote call. */
 		function reasonOf(error) {
 			if (!error) return "unknown error";
@@ -365,6 +416,7 @@ window.__ModuleLoader__.load({
 			check: "M5 12.5l4.5 4.5L19 7",
 			select: "M4.5 4.5h15v15h-15z|M8.5 12.6l2.6 2.6 4.6-5.4",
 			trash: "M4 7h16|M9.5 7V4.5h5V7|M6.5 7l1 13h9l1-13|M10.5 11v5|M13.5 11v5",
+			chevron: "M9 5.5l7 6.5-7 6.5",
 		};
 
 		function Icon(props) {
@@ -436,13 +488,14 @@ window.__ModuleLoader__.load({
 	height: 17px;
 	padding: 0 5px;
 	border-radius: 999px;
-	background: var(--dsw-alias-brand-primary, #4c6ef5);
+	background: linear-gradient(135deg, var(--dsw-alias-brand-primary, #5b8def), #7c5cd6);
 	color: #fff;
 	font-size: 10px;
 	font-weight: 600;
 	line-height: 17px;
 	text-align: center;
 	font-variant-numeric: tabular-nums;
+	box-shadow: 0 1px 3px rgba(91, 141, 239, 0.35);
 }
 
 /* Panel --------------------------------------------------------------- */
@@ -474,13 +527,13 @@ window.__ModuleLoader__.load({
 	gap: 8px;
 	padding: 9px 8px 9px 12px;
 	border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(127, 127, 127, 0.14));
-	background: linear-gradient(180deg, rgba(127, 127, 127, 0.07), rgba(127, 127, 127, 0));
+	background: linear-gradient(180deg, rgba(91, 141, 239, 0.14), rgba(124, 92, 214, 0.04));
 	cursor: grab;
 	user-select: none;
 	touch-action: none;
 }
 .dsh-am-head:active { cursor: grabbing; }
-.dsh-am-head-icon { display: inline-flex; color: var(--dsw-alias-label-tertiary, #7b8290); }
+.dsh-am-head-icon { display: inline-flex; color: var(--dsw-alias-brand-primary, #5b8def); }
 .dsh-am-head-title {
 	font-size: 13px;
 	font-weight: 600;
@@ -526,10 +579,31 @@ window.__ModuleLoader__.load({
 	outline-offset: 1px;
 }
 .dsh-am-icon-btn:disabled { opacity: 0.35; cursor: default; }
+/*
+ * Tone per action. Grey-on-grey made four icons in a row indistinguishable at
+ * a glance; restore/open/reveal now carry their own hue on hover, and the
+ * destructive one stays red. The base colour is still neutral, so the row is
+ * calm until the pointer arrives.
+ */
+.dsh-am-icon-btn[data-tone="open"]:hover:not(:disabled),
+.dsh-am-icon-btn[data-tone="open"]:focus-visible {
+	color: #4a7fe0;
+	background: rgba(74, 127, 224, 0.14);
+}
+.dsh-am-icon-btn[data-tone="restore"]:hover:not(:disabled),
+.dsh-am-icon-btn[data-tone="restore"]:focus-visible {
+	color: #2f9e6e;
+	background: rgba(47, 158, 110, 0.15);
+}
+.dsh-am-icon-btn[data-tone="reveal"]:hover:not(:disabled),
+.dsh-am-icon-btn[data-tone="reveal"]:focus-visible {
+	color: #c1802f;
+	background: rgba(193, 128, 47, 0.15);
+}
 .dsh-am-icon-btn.dsh-am-danger:hover:not(:disabled),
 .dsh-am-icon-btn.dsh-am-danger:focus-visible {
-	color: var(--dsw-alias-label-error, #c0392b);
-	background: var(--dsw-alias-interactive-bg-hover-danger, rgba(192, 57, 43, 0.12));
+	color: var(--dsw-alias-label-error, #d15b56);
+	background: rgba(209, 91, 86, 0.14);
 }
 
 .dsh-am-toolbar {
@@ -606,9 +680,45 @@ window.__ModuleLoader__.load({
 	display: flex;
 	align-items: center;
 	gap: 6px;
-	padding: 8px 6px 4px;
+	padding: 7px 6px 4px;
 	background: var(--dsw-alias-bg-layer-2, #fff);
 }
+/* The heading itself is the collapse toggle: one wide target, no tiny ✕. */
+.dsh-am-group-toggle {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 2px 4px;
+	border: 0;
+	border-radius: var(--dsw-radius-sm, 6px);
+	background: transparent;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+.dsh-am-group-toggle:hover { background: var(--dsw-alias-interactive-bg-hover, rgba(127, 127, 127, 0.1)); }
+.dsh-am-group-toggle:focus-visible {
+	outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, #4c8dff);
+	outline-offset: 1px;
+}
+.dsh-am-group-accent {
+	flex: none;
+	width: 7px;
+	height: 7px;
+	border-radius: 999px;
+	background: var(--dsh-am-accent, var(--dsw-alias-brand-primary, #5b8def));
+	box-shadow: 0 0 0 3px var(--dsh-am-accent-soft, rgba(91, 141, 239, 0.14));
+}
+.dsh-am-group-chevron {
+	display: inline-flex;
+	flex: none;
+	color: var(--dsw-alias-label-tertiary, #7b8290);
+	transition: transform 140ms ease;
+}
+.dsh-am-group-toggle[aria-expanded="false"] .dsh-am-group-chevron { transform: rotate(-90deg); }
 .dsh-am-group-title {
 	flex: 1 1 auto;
 	min-width: 0;
@@ -626,12 +736,19 @@ window.__ModuleLoader__.load({
 	min-width: 16px;
 	padding: 0 5px;
 	border-radius: 999px;
-	background: var(--dsw-alias-bg-layer-3, rgba(127, 127, 127, 0.1));
-	color: var(--dsw-alias-label-caption, #9aa1ad);
+	background: var(--dsh-am-accent-soft, var(--dsw-alias-bg-layer-3, rgba(127, 127, 127, 0.1)));
+	color: var(--dsh-am-accent, var(--dsw-alias-label-caption, #9aa1ad));
 	font-size: 10.5px;
+	font-weight: 600;
 	line-height: 16px;
 	text-align: center;
 	font-variant-numeric: tabular-nums;
+}
+/* Folded group: keep the heading, drop the rows, leave a one-line receipt. */
+.dsh-am-group-collapsed {
+	padding: 1px 8px 3px 25px;
+	font-size: 11px;
+	color: var(--dsw-alias-label-tertiary, #7b8290);
 }
 .dsh-am-group-actions {
 	display: flex;
@@ -829,7 +946,7 @@ window.__ModuleLoader__.load({
 	gap: 6px;
 	padding: 7px 10px;
 	border-top: 1px solid var(--dsw-alias-border-l1, rgba(127, 127, 127, 0.14));
-	background: var(--dsw-alias-bg-layer-3, rgba(127, 127, 127, 0.07));
+	background: linear-gradient(90deg, rgba(91, 141, 239, 0.13), rgba(124, 92, 214, 0.09));
 	animation: dsh-am-rise 140ms ease-out;
 }
 @keyframes dsh-am-rise {
@@ -880,8 +997,8 @@ window.__ModuleLoader__.load({
 	height: 40px;
 	margin-bottom: 4px;
 	border-radius: 12px;
-	background: var(--dsw-alias-bg-layer-3, rgba(127, 127, 127, 0.1));
-	color: var(--dsw-alias-label-tertiary, #7b8290);
+	background: linear-gradient(150deg, rgba(91, 141, 239, 0.16), rgba(124, 92, 214, 0.1));
+	color: var(--dsw-alias-brand-primary, #5b8def);
 }
 .dsh-am-empty-title { font-size: 13px; font-weight: 600; color: var(--dsw-alias-label-secondary, #5b6270); }
 .dsh-am-empty-hint { max-width: 240px; font-size: 12px; line-height: 1.6; color: var(--dsw-alias-label-tertiary, #7b8290); }
@@ -898,6 +1015,29 @@ window.__ModuleLoader__.load({
 }
 .dsh-am-foot-filtered { margin-left: auto; font-variant-numeric: tabular-nums; }
 .dsh-am-foot > .dsh-am-btn { flex: 0 0 auto; margin-left: 8px; }
+.dsh-am-foot-restore {
+	border-color: rgba(47, 158, 110, 0.32);
+	background: rgba(47, 158, 110, 0.1);
+	color: #2f9e6e;
+}
+.dsh-am-foot-restore:hover:not(:disabled) { background: rgba(47, 158, 110, 0.19); }
+
+/* "Delete all" lives beside "Restore all", never beside the ✕ ---------- */
+.dsh-am-foot-delete {
+	border-color: rgba(209, 91, 86, 0.32);
+	background: rgba(209, 91, 86, 0.1);
+	color: #cf5751;
+}
+.dsh-am-foot-delete:hover:not(:disabled) { background: rgba(209, 91, 86, 0.19); }
+.dsh-am-foot-confirm {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: 1 1 auto;
+	min-width: 0;
+	animation: dsh-am-confirm-in 120ms ease-out;
+}
+.dsh-am-foot-confirm .dsh-am-confirm-text { flex: 1 1 auto; font-size: 11px; }
 .dsh-am-foot-spinner { display: inline-flex; align-items: center; gap: 6px; }
 .dsh-am-toast {
 	position: absolute;
@@ -1108,6 +1248,8 @@ window.__ModuleLoader__.load({
 			const [selected, setSelected] = react.useState(null);
 			const [bulkConfirm, setBulkConfirm] = react.useState(false);
 			const [groupConfirm, setGroupConfirm] = react.useState(null);
+			const [collapsed, setCollapsed] = react.useState(null);
+			const [footerConfirm, setFooterConfirm] = react.useState(false);
 			const dragRef = react.useRef(null);
 			const queryRef = react.useRef(null);
 			const toastSeq = react.useRef(0);
@@ -1158,7 +1300,25 @@ window.__ModuleLoader__.load({
 				setConfirming(null);
 				setBulkConfirm(false);
 				setGroupConfirm(null);
+				setFooterConfirm(false);
 				setSelected(null);
+			};
+
+			/**
+			 * Fold or unfold one workspace group.
+			 *
+			 * Folding is purely visual: the rows stay in the archive, stay in the
+			 * selection and stay part of "restore all" / "delete all", so collapsing
+			 * a group can never silently change what a bulk action touches.
+			 */
+			const toggleGroup = (key) => {
+				setCollapsed((current) => {
+					const next = Object.assign({}, current || {});
+					if (next[key]) delete next[key];
+					else next[key] = true;
+					return Object.keys(next).length ? next : null;
+				});
+				setGroupConfirm(null);
 			};
 
 			react.useEffect(() => {
@@ -1371,7 +1531,21 @@ window.__ModuleLoader__.load({
 					notify("error", t("toast.unavailable"));
 					return;
 				}
+				setFooterConfirm(false);
 				await restoreIds(visibleIds.slice());
+			};
+
+			/**
+			 * Delete everything the panel is currently listing (search included),
+			 * after the footer's own inline confirmation.
+			 */
+			const deleteVisible = async () => {
+				setFooterConfirm(false);
+				if (typeof props.deleteMany !== "function") {
+					notify("error", t("toast.deleteUnavailable"));
+					return;
+				}
+				await deleteIds(visibleIds.slice());
 			};
 
 			const revealRow = async (row) => {
@@ -1622,9 +1796,15 @@ window.__ModuleLoader__.load({
 			} else {
 				body = visibleGroups.map((group) => {
 					const confirmingGroup = groupConfirm === group.key;
+					const isCollapsed = Boolean(collapsed && collapsed[group.key]);
 					return h(
 						"section",
-						{ className: "dsh-am-group", key: group.key },
+						{
+							className: "dsh-am-group",
+							key: group.key,
+							style: accentStyle(group.key),
+							"data-collapsed": isCollapsed ? "true" : undefined,
+						},
 						h(
 							"div",
 							{ className: "dsh-am-group-head" },
@@ -1657,25 +1837,45 @@ window.__ModuleLoader__.load({
 											t("delete.confirmNo"),
 										),
 									)
-								: [
+								: h(
+										react.Fragment,
+										null,
+										/*
+										 * The heading is the fold toggle: the whole caption is one
+										 * target, so collapsing never competes with the two group
+										 * actions sitting next to it.
+										 */
+										h(
+											"button",
+											{
+												type: "button",
+												className: "dsh-am-group-toggle",
+												title: isCollapsed ? t("group.expand") : t("group.collapse"),
+												"aria-expanded": isCollapsed ? "false" : "true",
+												onClick: () => toggleGroup(group.key),
+											},
+											h("span", { className: "dsh-am-group-chevron" }, h(Icon, { name: "chevron", size: 11 })),
+											h("span", { className: "dsh-am-group-accent" }),
+											h(
+												"span",
+												{ className: "dsh-am-group-title", title: group.path || group.title },
+												group.title,
+											),
+											h("span", { className: "dsh-am-group-count" }, String(group.rows.length)),
+										),
 										/*
 										 * Per-group actions, revealed on hover so the header stays
 										 * quiet: restore (harmless) and delete (asks in place).
 										 */
 										h(
-											"span",
-											{ className: "dsh-am-group-title", title: group.path || group.title, key: "title" },
-											group.title,
-										),
-										h("span", { className: "dsh-am-group-count", key: "count" }, String(group.rows.length)),
-										h(
 											"div",
-											{ className: "dsh-am-group-actions", key: "actions" },
+											{ className: "dsh-am-group-actions" },
 											h(
 												"button",
 												{
 													type: "button",
 													className: "dsh-am-icon-btn",
+													"data-tone": "restore",
 													title: t("group.restore", { count: group.rows.length }),
 													"aria-label": t("group.restore", { count: group.rows.length }),
 													disabled: progress !== null || typeof props.restoreMany !== "function",
@@ -1696,9 +1896,16 @@ window.__ModuleLoader__.load({
 												h(Icon, { name: "trash", size: 13 }),
 											),
 										),
-									],
+									),
 						),
-						group.rows.map((row) => {
+						isCollapsed
+							? h(
+									"div",
+									{ className: "dsh-am-group-collapsed" },
+									t("group.collapsed", { count: group.rows.length }),
+								)
+							: null,
+						isCollapsed ? null : group.rows.map((row) => {
 							const isBusy = busy(row.id);
 							const isConfirming = confirming === row.id;
 							const isSelected = selectedIds.indexOf(row.id) !== -1;
@@ -1935,30 +2142,79 @@ window.__ModuleLoader__.load({
 							h("span", { className: "dsh-am-spinner" }),
 							h("span", null, t("progress.running", { done: progress.done, total: progress.total })),
 						)
-					: h("span", null, t("foot.hint", { total })),
-				h(
-					"span",
-					{ className: "dsh-am-foot-filtered" },
-					progress || !needle ? null : t("foot.filtered", { shown, total }),
-				),
+					: footerConfirm
+						? h(
+								"div",
+								{ className: "dsh-am-foot-confirm" },
+								h(Icon, { name: "trash", size: 12 }),
+								h("span", { className: "dsh-am-confirm-text" }, t("deleteAll.confirm", { count: shown })),
+							)
+						: h("span", null, t("foot.hint", { total })),
+				footerConfirm
+					? null
+					: h(
+							"span",
+							{ className: "dsh-am-foot-filtered" },
+							progress || !needle ? null : t("foot.filtered", { shown, total }),
+						),
 				/*
-				 * "Restore all" lives here rather than beside ✕. One gap away from the
-				 * close button it was too easy to hit by accident; at the bottom of the
-				 * panel it is far from the ✕ and carries a label as well.
+				 * Both global actions live down here rather than beside ✕. One gap
+				 * away from the close button they were too easy to hit by accident;
+				 * at the bottom of the panel they are far from it, labelled, and the
+				 * destructive one asks first.
 				 */
-				h(
-					"button",
-					{
-						type: "button",
-						className: "dsh-am-btn dsh-am-foot-restore",
-						title: t("action.restoreAll"),
-						"aria-label": t("action.restoreAll"),
-						disabled: shown === 0 || progress !== null,
-						onClick: restoreVisible,
-					},
-					h(Icon, { name: "checkAll", size: 12 }),
-					h("span", { className: "dsh-am-btn-label" }, t("action.restoreAll")),
-				),
+				footerConfirm
+					? h(
+							react.Fragment,
+							null,
+							h(
+								"button",
+								{
+									type: "button",
+									className: "dsh-am-btn dsh-am-btn-danger",
+									onClick: () => deleteVisible(),
+								},
+								t("delete.confirmYes"),
+							),
+							h(
+								"button",
+								{
+									type: "button",
+									className: "dsh-am-btn dsh-am-btn-ghost",
+									onClick: () => setFooterConfirm(false),
+								},
+								t("delete.confirmNo"),
+							),
+						)
+					: h(
+							"button",
+							{
+								type: "button",
+								className: "dsh-am-btn dsh-am-foot-restore",
+								title: t("action.restoreAll"),
+								"aria-label": t("action.restoreAll"),
+								disabled: shown === 0 || progress !== null,
+								onClick: restoreVisible,
+							},
+							h(Icon, { name: "checkAll", size: 12 }),
+							h("span", { className: "dsh-am-btn-label" }, t("action.restoreAll")),
+						),
+				footerConfirm
+					? null
+					: h(
+							"button",
+							{
+								type: "button",
+								className: "dsh-am-btn dsh-am-foot-delete",
+								title: t("action.deleteAll"),
+								"aria-label": t("action.deleteAll"),
+								disabled:
+									shown === 0 || progress !== null || typeof props.deleteMany !== "function",
+								onClick: () => setFooterConfirm(true),
+							},
+							h(Icon, { name: "trash", size: 12 }),
+							h("span", { className: "dsh-am-btn-label" }, t("action.deleteAll")),
+						),
 			);
 
 			const handles = ["n", "s", "e", "w", "nw", "ne", "sw", "se"].map((side) =>

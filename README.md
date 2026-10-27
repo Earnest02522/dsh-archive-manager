@@ -23,7 +23,9 @@ or jump to the folder the conversation belongs to.
 > - **Delete, one or many** — remove archived conversations from disk, after an
 >   inline confirmation that happens *on the row* (or once for a batch, or once
 >   per workspace group).
-> - **Restore or delete a whole workspace group** from its heading.
+> - **Restore or delete a whole workspace group** from its heading — and fold a
+>   group away when you do not need to see it.
+> - **Delete all / restore all** from the panel footer, away from the ✕.
 > - **Reveal the working directory** of an archived conversation.
 
 ## Features
@@ -36,16 +38,29 @@ or jump to the folder the conversation belongs to.
 - **Restore** — removes the session from the archive set through DSH's own
   `workspaces.unarchiveSession(...)` service, so the sidebar, the workspace
   accounting and the durability layer all stay in sync.
-- **Restore all** — restores every archived conversation (and every
-  conversation matching the current search) sequentially, reporting partial
-  failures instead of stopping. It sits in the panel footer, deliberately far
-  from the ✕ and labelled — one gap away from the close button it was too easy
-  to hit by accident.
+- **Restore all / Delete all** — the footer carries both global actions, each
+  with an icon and a label, deliberately far from the ✕ (one gap away from the
+  close button they were too easy to hit by accident). *Restore all* unarchives
+  every visible conversation; *Delete all* asks once in the footer
+  (`Permanently delete all N archived conversations?`) before deleting them
+  sequentially. Both report partial failures instead of stopping, and both
+  respect the current search filter.
+- **Colour, not a sea of grey** — every workspace group gets a stable accent
+  colour hashed from its id (so colours do not jump when rows are deleted),
+  used by the heading dot, the count pill and the group's tint; the trigger
+  badge and the panel header are gradient, row actions have tinted hover tones
+  (blue open, green restore, amber reveal, red delete), and the bulk bar and
+  empty-state tile are tinted brand surfaces. All colours derive from
+  `--dsw-alias-*` tokens, so they follow the active theme.
 - **Multi-select** — every row carries a checkbox that appears on hover (always
   visible on touch); a bulk bar then offers *Restore selected*, *Delete
   selected* and *Clear*, and the header toggles *Select all* over the visible
   rows. The selection is pruned against the live archive set, so a batch can
   never act on a row that has already gone.
+- **Collapsible workspace groups** — the workspace heading itself is the fold
+  toggle (chevron, accent dot, title, count). Folding hides that group's rows and
+  leaves a one-line receipt (`3 hidden`); it is purely visual, so folded rows stay
+  selected and stay inside *Restore all* / *Delete all*.
 - **Per-workspace actions** — each workspace heading reveals *restore this
   group* and *delete this group* on hover, with the count baked into the
   tooltip. Deleting a group asks in place, inside its own heading, for that
@@ -215,7 +230,12 @@ patch template automatically.
 - Hover a workspace heading: *restore this group* and *delete this group*
   appear on the right; deleting asks inside the heading and touches only that
   group.
-- *Restore all* sits in the footer with a label, not next to the ✕.
+- Click a workspace heading: its rows fold away, leaving a `N hidden` line;
+  click again to unfold. Folded rows stay part of the bulk actions.
+- *Restore all* and *Delete all* sit in the footer with labels, not next to the
+  ✕; *Delete all* asks in the footer before unlinking anything.
+- The panel is colour-coded per workspace (dot, count pill, group tint) instead
+  of a flat grey surface, and follows the active theme.
 - Click anywhere outside the panel: it folds away, exactly like pressing `Esc`.
 - The host half is live when `archiveManager/deleteSession` answers; a missing
   host half only disables the trash icon (the rest still works).
@@ -250,7 +270,7 @@ node test/client.test.mjs
 `node test/client.test.mjs` runs `test/client.test.mjs`, a dependency-free
 harness with a hand-written mini React runtime that stubs
 `window.__ModuleLoader__`, `document` and `navigator`, applies the plugin to a
-fake `ctx`, and asserts 160 behaviours: the load contract, slot registration
+fake `ctx`, and asserts 184 behaviours: the load contract, slot registration
 (`name` / `id` / `order` / `locale`), Chinese fallback translation, grouping
 (3 workspaces → 3 groups), search filtering, single restore (service call +
 toast + reactive row removal), restore-and-open, bulk restore, reveal request
@@ -259,8 +279,10 @@ panel keeps its geometry, nothing is deleted before you confirm, the descriptor
 carries the strict codecs the gateway requires, the mount is reused, the archive
 snapshot is re-synced afterwards), multi-select restore and delete, *Select
 all*, per-workspace restore and delete (the group asks inside its own heading
-and only that group is touched), restore-all living in the footer instead of
-beside the ✕, click-away dismissal, refused deletion while a conversation is
+and only that group is touched), restore-all and delete-all living in the footer
+instead of beside the ✕, folding a group (rows hide, the receipt counts them,
+other groups keep theirs, unfolding restores them), click-away dismissal,
+refused deletion while a conversation is
 running, degraded mode without `unarchiveSession` or without a remote gateway,
 empty-archive and narrow-sidebar rendering, drag/resize geometry math, `Esc`
 handling, plus static assertions over both halves (browser bundle: only `react`

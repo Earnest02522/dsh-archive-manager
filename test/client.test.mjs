@@ -978,7 +978,90 @@ async function main() {
 		"restore-all moved to the footer",
 		Boolean(findAll(footerRegion, byLabel(injectedProps.t("action.restoreAll")))[0]),
 	);
+	check(
+		"delete-all also sits in the footer",
+		Boolean(findAll(footerRegion, byLabel(injectedProps.t("action.deleteAll")))[0]),
+	);
+	equal(
+		"the header offers no destructive batch action",
+		findAll(headerRegion, byLabel(injectedProps.t("action.deleteAll"))).length,
+		0,
+	);
 	awayFromClose.dispose();
+
+	console.log("\n# groups fold away");
+	const foldHarness = makeContext();
+	exports.apply(foldHarness.ctx);
+	const foldRegistration = foldHarness.registrations[0];
+	const foldView = mount(foldRegistration.Component, () => propsFor(foldRegistration, { wide: true }));
+	findAll(foldView.tree, byClass("dsh-am-trigger"))[0].props.onClick();
+	equal("three groups listed", findAll(foldView.tree, byClass("dsh-am-group")).length, 3);
+	equal("all rows listed before folding", findAll(foldView.tree, byClass("dsh-am-row")).length, 3);
+	const firstToggle = findAll(findAll(foldView.tree, byClass("dsh-am-group"))[0], byClass("dsh-am-group-toggle"))[0];
+	check("the group heading is the fold toggle", Boolean(firstToggle));
+	check("an unfolded group reports aria-expanded true", firstToggle.props["aria-expanded"] === "true");
+	firstToggle.props.onClick();
+	const foldedGroup = findAll(foldView.tree, byClass("dsh-am-group"))[0];
+	check("the folded group is flagged", foldedGroup.props["data-collapsed"] === "true");
+	equal("a folded group hides its rows", findAll(foldedGroup, byClass("dsh-am-row")).length, 0);
+	check(
+		"a folded group says how many it hides",
+		textOf(foldedGroup).indexOf(injectedProps.t("group.collapsed", { count: 1 })) !== -1,
+		textOf(foldedGroup),
+	);
+	equal("other groups keep their rows", findAll(foldView.tree, byClass("dsh-am-row")).length, 2);
+	check(
+		"the folded toggle reports aria-expanded false",
+		findAll(foldedGroup, byClass("dsh-am-group-toggle"))[0].props["aria-expanded"] === "false",
+	);
+	findAll(foldedGroup, byClass("dsh-am-group-toggle"))[0].props.onClick();
+	equal("unfolding restores the rows", findAll(foldView.tree, byClass("dsh-am-row")).length, 3);
+	check(
+		"an unfolded group is no longer flagged",
+		findAll(foldView.tree, byClass("dsh-am-group"))[0].props["data-collapsed"] === undefined,
+	);
+	foldView.dispose();
+
+	console.log("\n# delete all from the footer");
+	const wipeHarness = makeContext();
+	exports.apply(wipeHarness.ctx);
+	const wipeRegistration = wipeHarness.registrations[0];
+	const wipeProps = wipeRegistration.options.inject();
+	const wipeView = mount(wipeRegistration.Component, () => propsFor(wipeRegistration, { wide: true }));
+	findAll(wipeView.tree, byClass("dsh-am-trigger"))[0].props.onClick();
+	const wipeFooter = findAll(wipeView.tree, byClass("dsh-am-foot"))[0];
+	equal("delete-all is offered", findAll(wipeFooter, byLabel(wipeProps.t("action.deleteAll"))).length, 1);
+	findAll(wipeFooter, byLabel(wipeProps.t("action.deleteAll")))[0].props.onClick();
+	const wipeConfirm = findAll(wipeView.tree, byClass("dsh-am-foot-confirm"))[0];
+	check("delete-all asks in the footer", Boolean(wipeConfirm));
+	check(
+		"the question counts everything listed",
+		textOf(wipeConfirm).indexOf(wipeProps.t("deleteAll.confirm", { count: 3 })) !== -1,
+		textOf(wipeConfirm),
+	);
+	equal("nothing deleted before confirming", wipeHarness.calls.deleted.length, 0);
+	const wipeButtons = findAll(findAll(wipeView.tree, byClass("dsh-am-foot"))[0], byClass("dsh-am-btn"));
+	equal("the footer offers confirm and cancel", wipeButtons.length, 2);
+	wipeButtons[1].props.onClick();
+	equal("cancel closes the footer question", findAll(wipeView.tree, byClass("dsh-am-foot-confirm")).length, 0);
+	equal("cancel deletes nothing", wipeHarness.calls.deleted.length, 0);
+	check(
+		"delete-all is still offered after cancelling",
+		Boolean(findAll(findAll(wipeView.tree, byClass("dsh-am-foot"))[0], byLabel(wipeProps.t("action.deleteAll")))[0]),
+	);
+	findAll(findAll(wipeView.tree, byClass("dsh-am-foot"))[0], byLabel(wipeProps.t("action.deleteAll")))[0].props.onClick();
+	await findAll(findAll(wipeView.tree, byClass("dsh-am-foot"))[0], byClass("dsh-am-btn-danger"))[0].props.onClick();
+	equal(
+		"delete-all removes every listed conversation",
+		wipeHarness.calls.deleted.slice().sort().join(","),
+		"s-alpha-1,s-beta-1,s-orphan",
+	);
+	check(
+		"delete-all toast",
+		textOf(findAll(wipeView.tree, byClass("dsh-am-toast"))[0]).indexOf("已删除 3 个会话") !== -1,
+	);
+	equal("delete-all leaves no rows", findAll(wipeView.tree, byClass("dsh-am-row")).length, 0);
+	wipeView.dispose();
 
 	console.log("\n# click away collapses the panel");
 	const awayHarness = makeContext();
