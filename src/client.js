@@ -34,6 +34,8 @@ window.__ModuleLoader__.load({
 		const CSS_KEY = NS + "/client.css";
 		/** Slot order: after the native footer entries, before nothing else. */
 		const ORDER = 120;
+		/** Where the sidebar-entry width preference is remembered. */
+		const STYLE_KEY = NS + "/trigger-style";
 
 		const MIN_WIDTH = 320;
 		const MIN_HEIGHT = 264;
@@ -58,6 +60,8 @@ window.__ModuleLoader__.load({
 			"action.select": "选择该会话",
 			"action.selectAll": "全选",
 			"action.clearSelection": "清除选择",
+			"action.triggerWide": "入口改为通栏",
+			"action.triggerCompact": "入口改为紧凑",
 			"delete.confirm": "永久删除「{title}」？会话记录文件会被移除，无法撤销。",
 			"delete.confirmShort": "永久删除「{title}」？",
 			"delete.irreversible": "无法撤销",
@@ -118,6 +122,8 @@ window.__ModuleLoader__.load({
 			"action.select": "Select this conversation",
 			"action.selectAll": "Select all",
 			"action.clearSelection": "Clear selection",
+			"action.triggerWide": "Stretch the sidebar entry",
+			"action.triggerCompact": "Compact the sidebar entry",
 			"delete.confirm": "Permanently delete \"{title}\"? Its transcript file is removed and cannot be restored.",
 			"delete.confirmShort": "Permanently delete \"{title}\"?",
 			"delete.irreversible": "cannot be undone",
@@ -417,7 +423,33 @@ window.__ModuleLoader__.load({
 			select: "M4.5 4.5h15v15h-15z|M8.5 12.6l2.6 2.6 4.6-5.4",
 			trash: "M4 7h16|M9.5 7V4.5h5V7|M6.5 7l1 13h9l1-13|M10.5 11v5|M13.5 11v5",
 			chevron: "M9 5.5l7 6.5-7 6.5",
+			stretch: "M4 12h16|M8 8.5 4.5 12 8 15.5|M16 8.5 19.5 12 16 15.5",
 		};
+
+		/**
+		 * The sidebar entry ships compact: it hugs its own content, like a chip
+		 * next to the other footer controls. "Wide" is the optional variant that
+		 * stretches across the sidebar and lines up with the rows above it. It is
+		 * a matter of taste, so it is a preference — remembered per browser, and
+		 * never applied on its own.
+		 */
+		function storedTriggerStyle() {
+			try {
+				const storage = typeof window !== "undefined" ? window.localStorage : undefined;
+				return storage && storage.getItem(STYLE_KEY) === "wide" ? "wide" : "compact";
+			} catch {
+				return "compact";
+			}
+		}
+
+		function rememberTriggerStyle(style) {
+			try {
+				const storage = typeof window !== "undefined" ? window.localStorage : undefined;
+				if (storage) storage.setItem(STYLE_KEY, style);
+			} catch {
+				/* Blocked storage is not worth a broken panel. */
+			}
+		}
 
 		function Icon(props) {
 			const source = ICONS[props.name] || "";
@@ -480,6 +512,39 @@ window.__ModuleLoader__.load({
 }
 .dsh-am-trigger-icon { display: inline-flex; }
 .dsh-am-trigger-label { white-space: nowrap; }
+/*
+ * Optional "wide" entry, toggled from the panel header and remembered per
+ * browser. The footer slot is a full-width flex row, so growing the entry by
+ * flex makes it line up with the rows above instead of floating as a chip.
+ */
+.dsh-am-trigger[data-style="wide"] {
+	display: flex;
+	flex: 1 1 auto;
+	justify-content: flex-start;
+	gap: 8px;
+	min-width: 0;
+	height: 34px;
+	margin: 0 2px;
+	padding: 0 8px;
+	font-size: 13px;
+	text-align: left;
+}
+.dsh-am-trigger[data-style="wide"] .dsh-am-trigger-label {
+	flex: 0 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.dsh-am-trigger[data-style="wide"] .dsh-am-badge { margin-left: auto; }
+/* The collapsed rail wins over the wide preference: one square icon button. */
+.dsh-am-trigger[data-wide="false"] {
+	flex: none;
+	width: 36px;
+	height: 36px;
+	margin: 0;
+	padding: 0;
+	justify-content: center;
+}
 .dsh-am-badge {
 	display: inline-flex;
 	align-items: center;
@@ -579,6 +644,11 @@ window.__ModuleLoader__.load({
 	outline-offset: 1px;
 }
 .dsh-am-icon-btn:disabled { opacity: 0.35; cursor: default; }
+/* Pressed icon buttons (the entry-width toggle) stay visibly on. */
+.dsh-am-icon-btn[aria-pressed="true"] {
+	background: var(--dsw-alias-interactive-bg-active, rgba(127, 127, 127, 0.2));
+	color: var(--dsw-alias-label-primary, #1f2430);
+}
 /*
  * Tone per action. Grey-on-grey made four icons in a row indistinguishable at
  * a glance; restore/open/reveal now carry their own hue on hover, and the
@@ -1250,6 +1320,11 @@ window.__ModuleLoader__.load({
 			const [groupConfirm, setGroupConfirm] = react.useState(null);
 			const [collapsed, setCollapsed] = react.useState(null);
 			const [footerConfirm, setFooterConfirm] = react.useState(false);
+			/*
+			 * Compact by default: the entry only stretches when the user asks for
+			 * it, and the choice survives a reload.
+			 */
+			const [triggerStyle, setTriggerStyle] = react.useState(storedTriggerStyle);
 			const dragRef = react.useRef(null);
 			const queryRef = react.useRef(null);
 			const toastSeq = react.useRef(0);
@@ -1671,6 +1746,12 @@ window.__ModuleLoader__.load({
 				setConfirming(null);
 			};
 
+			const toggleTriggerStyle = () => {
+				const next = triggerStyle === "wide" ? "compact" : "wide";
+				setTriggerStyle(next);
+				rememberTriggerStyle(next);
+			};
+
 			const trigger = h(
 				"button",
 				{
@@ -1682,6 +1763,8 @@ window.__ModuleLoader__.load({
 					"aria-haspopup": "dialog",
 					"aria-expanded": open ? "true" : "false",
 					"data-dsh-am": "trigger",
+					"data-style": triggerStyle,
+					"data-wide": props.wide === false ? "false" : "true",
 					onClick: toggle,
 				},
 				h("span", { className: "dsh-am-trigger-icon" }, h(Icon, { name: "archive" })),
@@ -1724,6 +1807,22 @@ window.__ModuleLoader__.load({
 						onClick: toggleSelectAll,
 					},
 					h(Icon, { name: "select" }),
+				),
+				/*
+				 * Entry width is a taste, not a rule: the compact chip stays the
+				 * default, and this swaps it for the full-width row.
+				 */
+				h(
+					"button",
+					{
+						type: "button",
+						className: "dsh-am-icon-btn",
+						title: t(triggerStyle === "wide" ? "action.triggerCompact" : "action.triggerWide"),
+						"aria-label": t(triggerStyle === "wide" ? "action.triggerCompact" : "action.triggerWide"),
+						"aria-pressed": triggerStyle === "wide" ? "true" : "false",
+						onClick: toggleTriggerStyle,
+					},
+					h(Icon, { name: "stretch" }),
 				),
 				/*
 				 * "Restore all" deliberately does NOT live here: one gap away from the

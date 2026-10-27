@@ -81,6 +81,10 @@ or jump to the folder the conversation belongs to.
   outside closes it too (no manual ✕ needed), the header drags, all eight
   edges/corners resize, the geometry is clamped to the viewport, and row actions
   stay visible on touch devices.
+- **Optional wide sidebar entry** — the footer entry ships as a compact chip; the
+  stretch button in the panel header swaps it for a full-width row that lines up
+  with the conversations above it. The choice is remembered per browser, and the
+  collapsed rail stays a single square icon either way.
 - **i18n** — Chinese and English UI text, picked from the DSH locale first and
   the browser language second.
 - **Client-side UI, one Host Remote** — the panel is plain ESM served straight
@@ -270,7 +274,7 @@ node test/client.test.mjs
 `node test/client.test.mjs` runs `test/client.test.mjs`, a dependency-free
 harness with a hand-written mini React runtime that stubs
 `window.__ModuleLoader__`, `document` and `navigator`, applies the plugin to a
-fake `ctx`, and asserts 184 behaviours: the load contract, slot registration
+fake `ctx`, and asserts 198 behaviours: the load contract, slot registration
 (`name` / `id` / `order` / `locale`), Chinese fallback translation, grouping
 (3 workspaces → 3 groups), search filtering, single restore (service call +
 toast + reactive row removal), restore-and-open, bulk restore, reveal request
@@ -282,6 +286,8 @@ all*, per-workspace restore and delete (the group asks inside its own heading
 and only that group is touched), restore-all and delete-all living in the footer
 instead of beside the ✕, folding a group (rows hide, the receipt counts them,
 other groups keep theirs, unfolding restores them), click-away dismissal,
+the entry-width preference (compact by default, remembered once switched, the
+collapsed rail staying square),
 refused deletion while a conversation is
 running, degraded mode without `unarchiveSession` or without a remote gateway,
 empty-archive and narrow-sidebar rendering, drag/resize geometry math, `Esc`

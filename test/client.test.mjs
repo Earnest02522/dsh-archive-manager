@@ -278,11 +278,17 @@ function pressOutside(target) {
 }
 
 const listeners = new Map();
+const storage = new Map();
 const windowStub = {
 	innerWidth: 1440,
 	innerHeight: 900,
 	setTimeout: (fn, ms) => setTimeout(fn, ms),
 	clearTimeout: (handle) => clearTimeout(handle),
+	localStorage: {
+		getItem: (key) => (storage.has(key) ? storage.get(key) : null),
+		setItem: (key, value) => storage.set(key, String(value)),
+		removeItem: (key) => storage.delete(key),
+	},
 	addEventListener(name, handler) {
 		const list = listeners.get(name) || [];
 		list.push(handler);
@@ -656,6 +662,43 @@ async function main() {
 	check("label hidden when narrow", findAll(emptyView.tree, byClass("dsh-am-trigger-label")).length === 0);
 	emptyTrigger.props.onClick();
 	check("empty panel is stable", findAll(emptyView.tree, byClass("dsh-am-empty")).length === 1);
+
+	console.log("\n# the sidebar entry width is a preference");
+	const styleHarness = makeContext();
+	exports.apply(styleHarness.ctx);
+	const styleRegistration = styleHarness.registrations[0];
+	const styleView = mount(styleRegistration.Component, () => propsFor(styleRegistration, { wide: true }));
+	const styleTrigger = () => findAll(styleView.tree, byClass("dsh-am-trigger"))[0];
+	const widthToggle = () => findAll(styleView.tree, byClass("dsh-am-icon-btn")).find((node) => /入口|entry/.test(node.props["aria-label"] || ""));
+	equal("compact entry is the default", styleTrigger().props["data-style"], "compact");
+	equal("entry reports the wide sidebar", styleTrigger().props["data-wide"], "true");
+	styleTrigger().props.onClick();
+	check("width toggle offered in the panel header", Boolean(widthToggle()));
+	equal("toggle starts off", widthToggle().props["aria-pressed"], "false");
+
+	widthToggle().props.onClick();
+	equal("toggle switches the entry to wide", styleTrigger().props["data-style"], "wide");
+	equal("toggle reports itself as on", widthToggle().props["aria-pressed"], "true");
+	equal("preference is remembered", storage.get("dsh-archive-manager/trigger-style"), "wide");
+
+	// A fresh mount (new page load) starts from the stored preference.
+	const reloadHarness = makeContext();
+	exports.apply(reloadHarness.ctx);
+	const reloadRegistration = reloadHarness.registrations[0];
+	const reloadView = mount(reloadRegistration.Component, () => propsFor(reloadRegistration, { wide: true }));
+	equal(
+		"a reload keeps the wide entry",
+		findAll(reloadView.tree, byClass("dsh-am-trigger"))[0].props["data-style"],
+		"wide",
+	);
+
+	widthToggle().props.onClick();
+	equal("toggle switches back to compact", styleTrigger().props["data-style"], "compact");
+	equal("compact preference is remembered too", storage.get("dsh-archive-manager/trigger-style"), "compact");
+	storage.delete("dsh-archive-manager/trigger-style");
+	// Unmount before the later click-away section counts document listeners.
+	styleView.dispose();
+	reloadView.dispose();
 
 	console.log("\n# drag and resize");
 	const dragView = mount(registration.Component, () => propsFor(registration, { wide: true }));
@@ -1089,6 +1132,16 @@ async function main() {
 	check("restores through the workspaces service", source.indexOf("workspaces.unarchiveSession") !== -1);
 	check("reveals through the session remote", source.indexOf("openWorkspacePath") !== -1);
 	check("browser half never deletes files itself", source.indexOf("unlink(") === -1);
+	check(
+		"wide entry is opt-in styling, not the default",
+		/\.dsh-am-trigger\[data-style="wide"\]\s*\{[^}]*flex: 1 1 auto/.test(source),
+	);
+	check(
+		"collapsed rail stays square under the wide preference",
+		/\.dsh-am-trigger\[data-wide="false"\]\s*\{[^}]*width: 36px/.test(source),
+	);
+	check("entry width is a stored preference", /STYLE_KEY = NS \+ "\/trigger-style"/.test(source));
+	check("the preference defaults to compact", /=== "wide" \? "wide" : "compact"/.test(source));
 
 	console.log("\n# host surface");
 	const hostSource = readFileSync(new URL("../src/index.js", import.meta.url), "utf8");
