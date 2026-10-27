@@ -562,6 +562,7 @@ async function main() {
 	const view = mount(registration.Component, () => propsFor(registration, { wide: true }));
 	const trigger = findAll(view.tree, byClass("dsh-am-trigger"))[0];
 	check("trigger rendered", Boolean(trigger));
+	equal("wide trigger stretches across the sidebar", trigger.props["data-wide"], "true");
 	equal("badge shows the archive count", textOf(findAll(view.tree, byClass("dsh-am-badge"))[0]), "3");
 	equal("panel hidden initially", findAll(view.tree, byClass("dsh-am-panel")).length, 0);
 
@@ -654,6 +655,7 @@ async function main() {
 	check("trigger renders with an empty archive", Boolean(emptyTrigger));
 	check("no badge without archived sessions", findAll(emptyView.tree, byClass("dsh-am-badge")).length === 0);
 	check("label hidden when narrow", findAll(emptyView.tree, byClass("dsh-am-trigger-label")).length === 0);
+	equal("narrow trigger collapses to the rail button", emptyTrigger.props["data-wide"], "false");
 	emptyTrigger.props.onClick();
 	check("empty panel is stable", findAll(emptyView.tree, byClass("dsh-am-empty")).length === 1);
 
@@ -1089,6 +1091,18 @@ async function main() {
 	check("restores through the workspaces service", source.indexOf("workspaces.unarchiveSession") !== -1);
 	check("reveals through the session remote", source.indexOf("openWorkspacePath") !== -1);
 	check("browser half never deletes files itself", source.indexOf("unlink(") === -1);
+	check(
+		"sidebar entry stretches to the sidebar width",
+		/\.dsh-am-trigger\s*\{[^}]*flex: 1 1 auto/.test(source),
+	);
+	check(
+		"count sits at the far edge of the wide entry",
+		/\.dsh-am-trigger\[data-wide="true"\] \.dsh-am-badge\s*\{[^}]*margin-left: auto/.test(source),
+	);
+	check(
+		"collapsed rail keeps a square entry",
+		/\.dsh-am-trigger\[data-wide="false"\]\s*\{[^}]*width: 36px/.test(source),
+	);
 
 	console.log("\n# host surface");
 	const hostSource = readFileSync(new URL("../src/index.js", import.meta.url), "utf8");

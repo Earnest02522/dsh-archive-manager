@@ -447,21 +447,30 @@ window.__ModuleLoader__.load({
 		 * ------------------------------------------------------------------ */
 		const CSS = `
 /* Sidebar entry ------------------------------------------------------- */
+/*
+ * The footer slot is a full-width flex row, so the entry is sized to the
+ * sidebar's inner width instead of hugging its own content: it lines up with
+ * the rows above it, and the hover pill reads as one of them.
+ */
 .dsh-am-trigger {
 	position: relative;
-	display: inline-flex;
+	display: flex;
+	flex: 1 1 auto;
 	align-items: center;
-	gap: 6px;
-	min-width: 28px;
-	height: 28px;
+	justify-content: flex-start;
+	gap: 8px;
+	min-width: 0;
+	height: 34px;
+	margin: 0 2px;
 	padding: 0 8px;
 	border: 0;
 	border-radius: var(--dsw-radius-md, 8px);
 	background: transparent;
 	color: var(--dsw-alias-label-secondary, #5b6270);
 	font-family: inherit;
-	font-size: 12px;
+	font-size: 13px;
 	line-height: 1;
+	text-align: left;
 	cursor: pointer;
 	transition: background-color 120ms ease, color 120ms ease;
 }
@@ -478,8 +487,25 @@ window.__ModuleLoader__.load({
 	outline: var(--dsw-focus-ring-width, 2px) solid var(--dsw-focus-ring-color, #4c8dff);
 	outline-offset: 1px;
 }
-.dsh-am-trigger-icon { display: inline-flex; }
-.dsh-am-trigger-label { white-space: nowrap; }
+.dsh-am-trigger-icon { display: inline-flex; flex: none; }
+.dsh-am-trigger-label {
+	flex: 0 1 auto;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+/* The count trails the label at the far edge: the bar reads as a list row. */
+.dsh-am-trigger[data-wide="true"] .dsh-am-badge { margin-left: auto; }
+/* Collapsed rail: one square icon button, the same size as its neighbours. */
+.dsh-am-trigger[data-wide="false"] {
+	flex: none;
+	width: 36px;
+	height: 36px;
+	margin: 0;
+	padding: 0;
+	justify-content: center;
+}
 .dsh-am-badge {
 	display: inline-flex;
 	align-items: center;
@@ -1682,6 +1708,7 @@ window.__ModuleLoader__.load({
 					"aria-haspopup": "dialog",
 					"aria-expanded": open ? "true" : "false",
 					"data-dsh-am": "trigger",
+					"data-wide": props.wide === false ? "false" : "true",
 					onClick: toggle,
 				},
 				h("span", { className: "dsh-am-trigger-icon" }, h(Icon, { name: "archive" })),
