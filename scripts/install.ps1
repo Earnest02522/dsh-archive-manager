@@ -64,7 +64,7 @@ if (-not (Test-Path $patchFile)) { Write-Error "Patch file not found: $patchFile
 # 1) copy the plugin package
 Write-Host "==> Copying plugin files..." -ForegroundColor Cyan
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
-foreach ($item in @("package.json", "cordis.patch.yml", "src", "LICENSE", "README.md", "README.zh-CN.md")) {
+foreach ($item in @("package.json", "cordis.patch.yml", "src", "LICENSE", "README.md", "README.en.md", "docs")) {
     $src = Join-Path $repoRoot $item
     if (Test-Path $src) {
         Copy-Item -Path $src -Destination $dest -Recurse -Force

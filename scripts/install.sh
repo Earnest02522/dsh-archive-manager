@@ -63,7 +63,7 @@ echo "    Patch      : $PATCH_FILE"
 
 # 1) copy the plugin package
 mkdir -p "$DEST"
-for item in package.json cordis.patch.yml src LICENSE README.md README.zh-CN.md; do
+for item in package.json cordis.patch.yml src LICENSE README.md README.en.md docs; do
   [ -e "$REPO_ROOT/$item" ] && cp -R "$REPO_ROOT/$item" "$DEST/"
 done
 echo "    copied plugin files"

@@ -13,7 +13,7 @@
  * filter, single restore, bulk restore with a partial failure, the reveal
  * action, degraded mode (no unarchive API) and the drag/resize geometry.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync, statSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -1227,6 +1227,34 @@ async function main() {
 	const missing = Array.from(usedKeys).filter((key) => !zhKeys?.has(key) || !enKeys?.has(key));
 	equal("dictionary keys are present in both languages", missing.join(","), "");
 	check("the panel uses translated labels", usedKeys.size > 10, "keys: " + usedKeys.size);
+
+	console.log("\n# documentation");
+	const readmePath = fileURLToPath(new URL("../README.md", import.meta.url));
+	const readme = readFileSync(readmePath, "utf8");
+	check("the main README is Chinese", readme.indexOf("归档会话管理器") !== -1);
+	check(
+		"the README opens with a one-line feature list",
+		/一眼看完它能干什么\*\*：[^\n]+、[^\n]+、[^\n]+/.test(readme),
+	);
+	check("the README links the English translation", readme.indexOf("[English](README.en.md)") !== -1);
+	check("the English README exists", existsSync(fileURLToPath(new URL("../README.en.md", import.meta.url))));
+	check("the old zh-CN README is gone", !existsSync(fileURLToPath(new URL("../README.zh-CN.md", import.meta.url))));
+
+	const shots = Array.from(new Set(Array.from(readme.matchAll(/docs\/images\/([\w.-]+\.png)/g), (match) => match[1])));
+	check("the README embeds screenshots", shots.length >= 6, "images: " + shots.length);
+	const missingShots = shots.filter((name) => {
+		const path = fileURLToPath(new URL(`../docs/images/${name}`, import.meta.url));
+		if (!existsSync(path) || statSync(path).size < 512) return true;
+		return readFileSync(path).subarray(0, 8).toString("hex") !== "89504e470d0a1a0a";
+	});
+	equal("every embedded screenshot ships with the repo", missingShots.join(","), "");
+
+	const english = readFileSync(fileURLToPath(new URL("../README.en.md", import.meta.url)), "utf8");
+	check("the English README shows the same screenshots", english.indexOf("docs/images/panel-light.png") !== -1);
+	check(
+		"both READMEs document the delete cost",
+		readme.indexOf("删除的代价") !== -1 && english.indexOf("How delete works (and what it costs)") !== -1,
+	);
 
 	console.log("\n" + passed + " checks passed, " + failures.length + " failed");
 	if (failures.length) {

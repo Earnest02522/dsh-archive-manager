@@ -1,6 +1,6 @@
 {
   "name": "dsh-archive-manager",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "Archived-conversation manager for DeepSeek Harness: a colour-coded sidebar panel that lists archived conversations grouped under collapsible workspace headings, with per-row, per-workspace and bulk restore plus permanent delete, an optional full-width sidebar entry and comfortably sized controls. Adds one Host Remote for deletion and is otherwise a client-only UI plugin for DSH 0.2.x and newer.",
   "type": "module",
   "main": "src/index.js",
@@ -13,7 +13,8 @@
     "src",
     "cordis.patch.yml",
     "README.md",
-    "README.zh-CN.md",
+    "README.en.md",
+    "docs",
     "LICENSE"
   ],
   "scripts": {

@@ -1,222 +1,157 @@
-# dsh-archive-manager
+# 归档会话管理器 · dsh-archive-manager
 
-[English](README.md) | [简体中文](README.zh-CN.md)
+[简体中文](README.md) | [English](README.en.md)
 
-A plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) that adds
-**archived-conversation management**: a sidebar entry that lists your archived
-conversations — **grouped by workspace**, searchable — and lets you **restore**
-them one by one or **all at once**, open one straight back into the main view,
-or jump to the folder the conversation belongs to.
+给 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 用的归档会话面板：侧边栏底部一个小入口，点开就是一整个归档库——**按工作区分组、能搜索、能多选、能整组收拾、能删干净**。
 
-> **What the built-in features cover (DSH 0.2.x).** Modern DSH already ships an
-> *Archive session* action, an archived filter (`default` / `show` / `only`),
-> pinning, and a native archive API. This plugin does not replace those — it
-> adds what they do not do:
->
-> - **A single archived overview** — one panel that lists *every* archived
->   conversation, grouped by workspace, with per-group counts.
-> - **Bulk restore** — tick conversations (or *select all*) and restore the
->   selection in one go, instead of unarchiving them one by one from the sidebar.
-> - **Search** — filter the archive by title, session id or working directory.
-> - **Restore & open** — restore a conversation and immediately reveal it in
->   the main view.
-> - **Delete, one or many** — remove archived conversations from disk, after an
->   inline confirmation that happens *on the row* (or once for a batch, or once
->   per workspace group).
-> - **Restore or delete a whole workspace group** from its heading — and fold a
->   group away when you do not need to see it.
-> - **Delete all / restore all** from the panel footer, away from the ✕.
-> - **Reveal the working directory** of an archived conversation.
+![归档面板总览](docs/images/hero-light.png)
 
-## Features
+**一眼看完它能干什么**：按工作区分组、搜索标题 / 会话 ID / 工作目录、多选恢复、多选删除、整组恢复、整组删除、分组折叠收起、行内删除确认、全部恢复、全部删除、按工作区配颜色、入口宽度可选、深浅色自适应、`Esc` 或点击面板外自动收起、面板可拖拽可八向缩放。
 
-- **Archived overview, grouped by workspace** — popup panel opened from a
-  button at the bottom of the sidebar (`sidebar.footer.action`). Every archived
-  conversation is listed under its workspace heading (sessions that no
-  workspace claims fall into *Ungrouped*), newest first, with title, short
-  session id, relative time and working directory.
-- **Restore** — removes the session from the archive set through DSH's own
-  `workspaces.unarchiveSession(...)` service, so the sidebar, the workspace
-  accounting and the durability layer all stay in sync.
-- **Restore all / Delete all** — the footer carries both global actions, each
-  with an icon and a label, deliberately far from the ✕ (one gap away from the
-  close button they were too easy to hit by accident). *Restore all* unarchives
-  every visible conversation; *Delete all* asks once in the footer
-  (`Permanently delete all N archived conversations?`) before deleting them
-  sequentially. Both report partial failures instead of stopping, and both
-  respect the current search filter.
-- **Colour, not a sea of grey** — every workspace group gets a stable accent
-  colour hashed from its id (so colours do not jump when rows are deleted),
-  used by the heading dot, the count pill and the group's tint; the trigger
-  badge and the panel header are gradient, row actions have tinted hover tones
-  (blue open, green restore, amber reveal, red delete), and the bulk bar and
-  empty-state tile are tinted brand surfaces. All colours derive from
-  `--dsw-alias-*` tokens, so they follow the active theme.
-- **Multi-select** — every row is a selection target: clicking anywhere on the
-  row bar ticks it, and the checkbox on the left is just the visual cue (it
-  appears on hover, stays visible while a selection exists, and is always shown
-  on touch). A bulk bar then offers *Restore selected*, *Delete selected* and
-  *Clear*, and the header toggles *Select all* over the visible rows. Clicks that
-  land on one of the row actions still run that action instead of selecting. The
-  selection is pruned against the live archive set, so a batch can never act on a
-  row that has already gone.
-- **Collapsible workspace groups** — the workspace heading itself is the fold
-  toggle (chevron, accent dot, title, count). Folding hides that group's rows and
-  leaves a one-line receipt (`3 hidden`); it is purely visual, so folded rows stay
-  selected and stay inside *Restore all* / *Delete all*.
-- **Per-workspace actions** — each workspace heading reveals *restore this
-  group* and *delete this group* on hover, with the count baked into the
-  tooltip. Deleting a group asks in place, inside its own heading, for that
-  group only.
-- **Restore & open** — restores and then opens the conversation in the main
-  view through the `uiWorkspace` service (skipped gracefully when that service
-  is not available).
-- **Reveal working directory** — asks the host to reveal the session's `cwd`
-  in the platform file manager (`session/openWorkspacePath { action: "reveal" }`).
-- **Delete permanently** — the only destructive action. Pressing the trash icon
-  turns *that row* into an inline `Delete? / Delete / Cancel` prompt, so the
-  panel neither reflows nor loses your place; a batch asks once for the whole
-  selection. Confirming asks the host to unlink the transcript, drops the id
-  from `archivedSessionIds`, detaches it from its workspace and announces
-  `api-session/removed`, so the sidebar forgets it without a restart.
-  Conversations with running work are refused (`session-active`).
-- **Opens and closes itself** — `Esc` closes the panel, a pointer press anywhere
-  outside closes it too (no manual ✕ needed), the header drags, all eight
-  edges/corners resize, the geometry is clamped to the viewport, and row actions
-  stay visible on touch devices.
-- **Optional wide sidebar entry** — the footer entry ships as a compact chip; the
-  stretch button in the panel header swaps it for a full-width row that lines up
-  with the conversations above it. The choice is remembered per browser, and the
-  collapsed rail stays a single square icon either way.
-- **Comfortable targets** — the workspace heading is a full-width 34px-tall
-  toggle, the four row actions are 30px squares with 16px glyphs, rows are 50px
-  tall, and the panel now opens at 456×552 (minimum 344×280) so the controls are
-  not crammed against the text.
-- **i18n** — Chinese and English UI text, picked from the DSH locale first and
-  the browser language second.
-- **Client-side UI, one Host Remote** — the panel is plain ESM served straight
-  to the browser (no build step); the single destructive operation is a small
-  host service instead of a filesystem hack from the page.
+---
 
-## Why most of this is a client-only plugin
+## 为什么会有这个插件
 
-Older releases (≤ 0.5.x) registered a root Typert Remote service
-(`ctx.archiveManager`) on the host and mounted a hand-written descriptor from
-the browser bundle with `ctx.remote.$mount(...)`. That design did not survive
-DSH 0.2: contributed descriptors are validated strictly (`validateContribution`
-→ `requireStrictInputs`, plus namespace collisions against the built-in
-`remote.*` services), and the archive feature became a first-class part of the
-`workspaces` client service. Everything reversible — listing, search, restore,
-open, reveal — therefore talks to services DSH already provides.
+我平时在 DSH 里同时开着好几个工作区：写文档一个、改插件一个、翻笔记又一个。DSH 自带的「归档会话」很好用，但归档之后它们就散落在侧边栏各个工作区里，想找一条三天前收起来的东西，得先把整个列表翻一遍。
 
-Deletion is the one thing DSH does **not** provide. There is no delete endpoint
-in `sessionController`, nothing writable in `workspace-files`, and the browser
-cannot touch `~/.dsh/sessions/...`. So v0.7.0 added exactly one Host Remote:
+所以我想要一张**归档的收纳桌**：所有收起来的东西都在这张桌子上，按工作区分堆、标上数量，一眼能数清；要用的挑出来放回去，不要的直接扔掉。这就是这个插件。
 
-| Layer | What happens |
+顺带一句：它最早是为了修「新版 DSH 装不上」才重写的，后来被我一路加了多选、整组操作、折叠和配色——**我自己每天在用，所以哪里点着别扭就改哪里**。
+
+---
+
+## 界面
+
+| 浅色 | 深色 |
+| :--: | :--: |
+| ![浅色面板](docs/images/panel-light.png) | ![深色面板](docs/images/panel-dark.png) |
+
+### 多选：整行都是选择区
+
+不用非得去点最左边那个小方框——**点行条任意位置就能勾上**（点右边的操作图标除外，那还是会执行操作）。勾上之后底部浮出批量栏，可以一次恢复或删除。
+
+![多选与批量栏](docs/images/selected-light.png)
+
+### 删除：确认就长在这一行上
+
+点垃圾桶，**这一行原地变成确认条**（`永久删除「…」？` + 删除 / 取消），不弹窗、不跳位、不把下面的行挤走。批量删除只在批量栏确认一次，整组删除只在工作组标题里确认一次。
+
+![行内删除确认](docs/images/confirm-light.png)
+
+### 整组操作：鼠标移到工作区标题上就会出现
+
+每个工作区分组自带「恢复整组 / 删除整组」，数量写在提示里；点标题本身可以**把整组折叠起来**，只留一行 `已收起 N 个`。折叠只是视觉上的——收起来的行仍然算在「全部恢复 / 全部删除」里，不会偷偷改变批量操作的范围。
+
+| 整组操作 | 折叠收起 |
+| :--: | :--: |
+| ![整组操作](docs/images/group-actions-dark.png) | ![折叠](docs/images/collapsed-light.png) |
+
+### 入口：紧凑小芯片，也可以拉通栏
+
+侧边栏底部默认是一枚紧凑的小芯片（带归档数量角标）：
+
+![侧边栏入口](docs/images/entry-light.png)
+
+面板右上角的「拉宽」按钮可以把它切成通栏样式，和上面的会话列表对齐；这个选择按浏览器记住，收起的窄边栏则始终是方图标。
+
+---
+
+## 功能细节
+
+- **归档总览，按工作区分组** — 面板从侧边栏底部 `sidebar.footer.action` 打开，每条归档会话挂在自己的工作区标题下（不属于任何工作区的落到「未分组」），新归档的排在前面，显示标题、短 ID、相对时间和工作目录。
+- **恢复** — 走 DSH 自己的 `workspaces.unarchiveSession(id)`，侧边栏、工作区记账和持久化层一起同步，不是改完界面就算数。
+- **多选** — 点行条即选中，批量栏提供「恢复所选 / 删除所选 / 清除」，标题栏可以「全选」当前可见项；选择集每次渲染都对着真实归档集过滤，已经消失的行不会被误操作。
+- **整组恢复 / 整组删除** — 悬停工作区标题时出现在右侧，数量写在 tooltip 里；删除只在这个标题内部确认，也只影响这一组。
+- **折叠收起** — 工作区标题本身就是折叠开关（箭头、色点、标题、数量），折叠后留一行 `已收起 N 个`。
+- **全部恢复 / 全部删除** — 都在面板底部，带图标和文字，**故意离右上角的 ✕ 很远**（以前挨着它，太容易误点）。「全部删除」先在底部问一次，再逐条删；两个按钮都尊重当前搜索过滤，并且遇到失败会报告「成功 N 条、失败 M 条」而不是直接中断。
+- **搜索** — 按标题、会话 ID 或工作目录过滤。
+- **恢复并打开** — 恢复之后直接把会话在主视图里打开（`uiWorkspace` 不可用时会优雅降级）。
+- **显示工作目录** — 交给宿主机在系统文件管理器里定位会话的 `cwd`（`session/openWorkspacePath { action: "reveal" }`）。
+- **删除** — 插件里唯一的破坏性操作，见下面「删除的代价」。
+- **配色** — 每个工作区从 ID 哈希出一个稳定的强调色（删行不会让颜色乱跳），用在标题色点、数量胶囊和分组底色上；入口角标和面板标题是渐变，行操作的悬停色调各自不同（打开=蓝、恢复=绿、定位=琥珀、删除=红），批量栏和空状态是带品牌色的色块。所有颜色都由 `--dsw-alias-*` 变量推导，跟随 DSH 主题明暗切换。
+- **自己会收起来** — `Esc` 关闭，点面板外面任意位置也关闭；标题栏可拖拽，八条边/角都能缩放，位置尺寸会被限制在视口内；触摸设备上操作图标常显。
+- **尺寸友好** — 工作区标题是 34px 高的整行按钮，四个行操作是 30px 方块配 16px 图标，行高 50px，面板默认 456×552（最小 344×280），不挤字。
+- **中英双语** — 优先跟随 DSH 的界面语言，其次看浏览器语言。
+- **客户端 UI + 一个宿主远程方法** — 面板是直接发给浏览器的 ESM，没有构建步骤；唯一需要碰磁盘的删除动作交给一个很小的宿主服务，而不是让页面去动文件系统。
+
+---
+
+## 它是怎么工作的
+
+老版本（≤ 0.5.x）在宿主上注册了一个根级 Typert Remote 服务，再在浏览器端用 `ctx.remote.$mount(...)` 挂手写描述符。这套做法在 DSH 0.2 上活不下来：贡献的描述符会被严格校验（`validateContribution` → `requireStrictInputs`，还要避开内置 `remote.*` 的命名冲突），而归档本身已经变成 `workspaces` 客户端服务的一等公民。所以**所有可逆操作**——列清单、搜索、恢复、打开、定位——都直接调用 DSH 已有的服务。
+
+只有删除是 DSH 没提供的。`sessionController` 里没有删除端点，`workspace-files` 是只读的，浏览器也碰不到 `~/.dsh/sessions/...`。于是 0.7.0 起多了唯一一个宿主远程方法：
+
+| 层 | 做什么 |
 |---|---|
-| Host plugin (`src/index.js`) | `ArchiveManagerService extends TypertRemoteService` (service key / namespace `archiveManager`) with one remote method, `deleteSession(request)`: checks for running work, locates the transcript through `sessionPersistence.stat` + `locate`, unlinks it, prunes the id from `archivedSessionIds`, detaches it from every workspace, and emits `api-session/removed`. The method returns an outcome value (`{ deleted: true, … }` or `{ deleted: false, reason }`) instead of throwing. |
-| Browser plugin (`src/client.js`) | Registers a `sidebar.footer.action` slot entry. Reads `workspaces.list` (`{ items, archivedSessionIds, pinnedSessionIds, … }`) and `sessions.list` (`{ ids, byId, … }`) as reactive snapshot stores, restores through `workspaces.unarchiveSession(id)`, opens through `uiWorkspace.openSession(id)`, reveals through `remote.session.openWorkspacePath({ path, action: "reveal" })`, and deletes through the mounted `remote.archiveManager.deleteSession({ sessionId })`. If that mount fails, the panel still renders and the delete action reports itself as unavailable. |
+| 宿主 `src/index.js` | `ArchiveManagerService extends TypertRemoteService`（服务键 / 命名空间 `archiveManager`），只有一个方法 `deleteSession(request)`：先检查是否在跑，再用 `sessionPersistence.stat` + `locate` 定位日志并 unlink，把它从 `archivedSessionIds` 摘掉、从各工作区 detach，最后发出 `api-session/removed`。返回结果值（`{ deleted: true, … }` 或 `{ deleted: false, reason }`），不靠抛异常表达业务失败。 |
+| 浏览器 `src/client.js` | 注册 `sidebar.footer.action` 槽位；把 `workspaces.list`（`{ items, archivedSessionIds, pinnedSessionIds, … }`）和 `sessions.list`（`{ ids, byId, … }`）当响应式快照读；恢复走 `workspaces.unarchiveSession(id)`，打开走 `uiWorkspace.openSession(id)`，定位走 `remote.session.openWorkspacePath({ path, action: "reveal" })`，删除走挂载后的 `remote.archiveManager.deleteSession({ sessionId })`。挂载失败时面板照常可用，只是垃圾桶会显示为不可用。 |
 
-No DSH source is patched. The plugin is discovered by the standard loader (the
-profile's `cordis.patch.yml` / `dsh.profile.bundles`) and its browser half by
-the client module loader (`dsh.client.platform = "web"`).
+没有改 DSH 一行源码：插件由标准加载器发现（profile 的 `cordis.patch.yml` / `dsh.profile.bundles`），浏览器半边由客户端模块加载器加载（`dsh.client.platform = "web"`）。
 
-## Compatibility
+---
 
-- **DSH 0.2.1-rc.3 and newer (desktop app)** — verified against
-  `@deepseek-ai/dsh-desktop-runtime 0.2.1-rc.3`: the host service registers, the
-  `archiveManager/deleteSession` endpoint answers over the real gateway, the
-  bundle is served, the slot is registered and the panel renders against the live
-  `workspaces` / `sessions` / `remote.session` services.
-- **Version gate:** the manifest declares `engines.dsh` (`>=0.2.1-0 <1.0.0`),
-  which is the only requirement DSH 0.2 evaluates. Older releases relied on
-  `@deepseek-ai/dsh-*` peer ranges instead, and semver prerelease rules made
-  `0.2.1-rc.3` fail `>=0.1.0-rc.6` — that is exactly why 0.5.x was reported as
-  incompatible with the current desktop app.
-- **DSH 0.1.x is no longer supported.** The plugin relies on the `workspaces`
-  client service (archive snapshot + `unarchiveSession`), the
-  `session/openWorkspacePath` endpoint, and the `TypertRemoteService` /
-  `@Remote` host API of the 0.2 line.
-- Platform-agnostic: revealing a folder is delegated to the host, so it works
-  with Explorer, Finder and xdg-open alike.
+## 兼容性
 
-## Install
+- **DSH 0.2.1-rc.3 及更新的桌面端**——对着 `@deepseek-ai/dsh-desktop-runtime 0.2.1-rc.3` 实测：宿主服务能注册、`archiveManager/deleteSession` 在真实网关上可用、浏览器 bundle 能被服务端返回、槽位注册成功、面板对着真实的 `workspaces` / `sessions` / `remote.session` 渲染。
+- **版本门槛**：manifest 里写的是 `engines.dsh`（`>=0.2.1-0 <1.0.0`），这是 DSH 0.2 唯一会检查的兼容性字段。老版本用的是 `@deepseek-ai/dsh-*` 的 peer 版本区间，而 semver 的预发布规则让 `0.2.1-rc.3` 不满足 `>=0.1.0-rc.6`——这就是当年「装不上」的真正原因。
+- **不再支持 DSH 0.1.x**：依赖 `workspaces` 客户端服务（归档快照 + `unarchiveSession`）、`session/openWorkspacePath` 端点，以及 0.2 线的 `TypertRemoteService` / `@Remote` 宿主 API。
+- 跨平台：定位文件夹交给宿主，Explorer / Finder / xdg-open 都行。
 
-### Official CLI — npx (recommended, no global install)
+---
+
+## 安装
+
+### 官方 CLI（推荐，不需要全局安装）
 
 ```powershell
 npx --yes @deepseek-ai/dsh plugin --profile desktop add https://github.com/Earnest02522/dsh-archive-manager.git
 ```
 
-The desktop app's profile is `desktop`; a `dsh web` install uses `--profile web`.
+桌面端 profile 名叫 `desktop`；`dsh web` 环境用 `--profile web`。
 
-`npx --yes @deepseek-ai/dsh` runs the official CLI straight from the npx cache,
-so **no global install is needed** — most machines do not have `dsh` on `PATH`.
+> 桌面端 profile 必须先存在：先打开一次 DeepSeek Harness Desktop，然后**完全退出**再执行命令。
 
-> The desktop profile must exist before installing: open DeepSeek Harness
-> Desktop once, then fully quit it while running the command.
-
-### Or: global install, then plain `dsh`
+### 或者先全局装 CLI
 
 ```powershell
 npm install -g @deepseek-ai/dsh
 dsh plugin --profile desktop add https://github.com/Earnest02522/dsh-archive-manager.git
 ```
 
-Both forms are equivalent. The package declares a `dsh.bundle` manifest, so
-`plugin add` installs the dependency **and** registers its loader line
-automatically — no manual patch editing. From a local checkout a path works too:
+两种写法等价。包里有 `dsh.bundle` 清单，`plugin add` 会自动写依赖**并**登记加载器条目，不用手改 patch。本地目录也可以：
 
 ```powershell
 npx --yes @deepseek-ai/dsh plugin --profile desktop add "file:D:\path\to\dsh-archive-manager"
 ```
 
-> After install: restart DSH (or let the patch HMR re-compose the config), then
-> hard-refresh the browser (`Ctrl+Shift+R`).
+> 装完重启 DSH（或让 patch HMR 重新合成配置），浏览器再硬刷新一次（`Ctrl+Shift+R`）。
 
-### Windows install script (legacy fallback)
-
-Open PowerShell and `cd` into the repo folder first, then run the script:
+### 安装脚本（备用方案）
 
 ```powershell
-cd <path-to-repo>          # e.g. cd D:\dsh-archive-manager
+cd <repo 路径>
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
+# 指定 profile：
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -ProfileName desktop
 ```
 
-Or from anywhere, with the repo at `<repo>`:
+脚本会按 `desktop` → `web` → 唯一存在的 profile 自动挑选，把插件复制进 `<profile>/node_modules`，并在 `<profile>/cordis.patch.yml` 里启用它（改之前先建带时间戳的备份；已经存在就什么都不做）。
 
-```powershell
-powershell -ExecutionPolicy Bypass -File <repo>\scripts\install.ps1
-# non-default profile:
-powershell -ExecutionPolicy Bypass -File <repo>\scripts\install.ps1 -ProfileName desktop
-```
-
-The script auto-detects the profile (`desktop`, then `web`, then the only
-profile present), copies the plugin into `<profile>/node_modules`, and enables
-it in the profile's `cordis.patch.yml` (a timestamped backup is created first).
-If the entry already exists it is a no-op.
-
-### Linux / macOS install script
-
-The repo also bundles a bash installer with the same auto-detection:
+Linux / macOS：
 
 ```bash
-cd <path-to-repo>          # e.g. cd ~/dsh-archive-manager
+cd <repo 路径>
 bash scripts/install.sh
-# non-default profile / scoped package name:
-bash scripts/install.sh web "@earnest020522/dsh-archive-manager"
+# bash scripts/install.sh web "@earnest020522/dsh-archive-manager"
 ```
 
-It uses `$DSH_HOME` when set, otherwise `~/.dsh`, and handles the empty `[]`
-patch template automatically.
+脚本优先用 `$DSH_HOME`，没有就用 `~/.dsh`，也能处理空 `[]` 的 patch 模板。
 
-### Manual install
+### 手动安装
 
-1. Copy this folder to
-   `%USERPROFILE%\.dsh\profiles\desktop\node_modules\dsh-archive-manager`
-   (or into the `dsh.profile.bundles` list of the profile you use).
-2. Edit `%USERPROFILE%\.dsh\profiles\desktop\cordis.patch.yml` and append:
+1. 把这个目录复制到 `%USERPROFILE%\.dsh\profiles\desktop\node_modules\dsh-archive-manager`（或者加进所使用 profile 的 `dsh.profile.bundles`）。
+2. 编辑 `%USERPROFILE%\.dsh\profiles\desktop\cordis.patch.yml`，追加：
 
    ```yaml
    - insert:
@@ -224,53 +159,40 @@ patch template automatically.
          name: dsh-archive-manager
    ```
 
-3. Restart DSH, then hard-refresh the browser (`Ctrl+Shift+R`).
+3. 重启 DSH，硬刷新浏览器。
 
-### Verify
+---
 
-- The sidebar foot shows a **归档 / Archive** button next to Settings.
-- Click it: archived conversations appear under their workspace headings with
-  search, row actions and a footer counter.
-- Hover a row: the trash icon offers **Delete**; the row itself turns into a
-  `Delete? / Delete / Cancel` prompt and, once confirmed, reports
-  `已删除 / Deleted`. Running conversations are refused, and the row disappears
-  on its own.
-- Tick a few checkboxes: the bulk bar appears above the footer with *Restore
-  selected* / *Delete selected*; deleting a batch asks once for the whole
-  selection.
-- Hover a workspace heading: *restore this group* and *delete this group*
-  appear on the right; deleting asks inside the heading and touches only that
-  group.
-- Click a workspace heading: its rows fold away, leaving a `N hidden` line;
-  click again to unfold. Folded rows stay part of the bulk actions.
-- *Restore all* and *Delete all* sit in the footer with labels, not next to the
-  ✕; *Delete all* asks in the footer before unlinking anything.
-- The panel is colour-coded per workspace (dot, count pill, group tint) instead
-  of a flat grey surface, and follows the active theme.
-- Click anywhere outside the panel: it folds away, exactly like pressing `Esc`.
-- The host half is live when `archiveManager/deleteSession` answers; a missing
-  host half only disables the trash icon (the rest still works).
-- With DSH's devtools open, the browser bundle
-  `plugins/??dsh-archive-manager/client.js` must appear in the page's preload
-  list and must not raise a module-loader error.
+## 怎么确认装好了
 
-## Uninstall
+- 侧边栏底部「设置」旁边出现 **归档 / Archive** 按钮，带数量角标。
+- 点开：归档会话按工作区分组列出，带搜索、行操作和底部计数。
+- 悬停某一行出现垃圾桶；点它这一行原地变成确认条，确认后提示「已删除」，行自己消失；正在运行的会话会被拒绝。
+- 勾几行：底部浮出批量栏，可恢复或删除所选；批量删除只问一次。
+- 悬停工作区标题：右侧出现「恢复整组 / 删除整组」，删除只影响这一组，而且在这个标题内部确认。
+- 点工作区标题：整组折叠成一行 `已收起 N 个`，再点展开；收起的行仍然参与批量操作。
+- 「全部恢复 / 全部删除」在面板底部、带文字标签，离 ✕ 很远；「全部删除」会先在底部问一次。
+- 面板按工作区上了颜色（色点、数量胶囊、分组底色），并跟随主题明暗。
+- 点面板外面任意位置：面板收起，和按 `Esc` 一样。
+- 打开 DSH 开发者工具：预加载列表里能看到 `plugins/??dsh-archive-manager/client.js`，控制台没有模块加载错误。
+- 宿主半边是否在线，看 `archiveManager/deleteSession` 有没有响应；宿主半边缺失只会让垃圾桶不可用，其余功能照常。
+
+---
+
+## 卸载
 
 ```powershell
 npx --yes @deepseek-ai/dsh plugin --profile desktop remove dsh-archive-manager
-# with a global install, the equivalent is:
-#   dsh plugin --profile desktop remove dsh-archive-manager
+# 全局安装时等价于：dsh plugin --profile desktop remove dsh-archive-manager
 ```
 
-then restart DSH. Legacy fallbacks: run
-`powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1`, or remove the
-`dsh-archive-manager` loader entry from the profile's `cordis.patch.yml` and
-delete `<profile>/node_modules/dsh-archive-manager`.
+然后重启 DSH。备用方案：跑 `powershell -ExecutionPolicy Bypass -File .\scripts\uninstall.ps1`，或者手动从 profile 的 `cordis.patch.yml` 里删掉 `dsh-archive-manager` 那一行、再删 `<profile>/node_modules/dsh-archive-manager`。
 
-## Development
+---
 
-No build step: `src/index.js` is the host plugin (one remote method),
-`src/client.js` is the browser bundle in module-loader format. Sanity checks:
+## 开发与测试
+
+没有构建步骤：`src/index.js` 是宿主插件（一个远程方法），`src/client.js` 是模块加载器格式的浏览器 bundle。
 
 ```powershell
 node --check src/index.js
@@ -278,85 +200,47 @@ node --check src/client.js
 node test/client.test.mjs
 ```
 
-`node test/client.test.mjs` runs `test/client.test.mjs`, a dependency-free
-harness with a hand-written mini React runtime that stubs
-`window.__ModuleLoader__`, `document` and `navigator`, applies the plugin to a
-fake `ctx`, and asserts 211 behaviours: the load contract, slot registration
-(`name` / `id` / `order` / `locale`), Chinese fallback translation, grouping
-(3 workspaces → 3 groups), search filtering, single restore (service call +
-toast + reactive row removal), restore-and-open, bulk restore, reveal request
-payload, the row-inline delete confirmation (the row keeps its place and the
-panel keeps its geometry, nothing is deleted before you confirm, the descriptor
-carries the strict codecs the gateway requires, the mount is reused, the archive
-snapshot is re-synced afterwards), multi-select restore and delete, *Select
-all*, selecting by clicking the row bar (and clicks on an action button *not*
-selecting while they still run the action), per-workspace restore and delete (the group asks inside its own heading
-and only that group is touched), restore-all and delete-all living in the footer
-instead of beside the ✕, folding a group (rows hide, the receipt counts them,
-other groups keep theirs, unfolding restores them), click-away dismissal,
-the entry-width preference (compact by default, remembered once switched, the
-collapsed rail staying square), the target sizes (30px action squares, a 34px
-group toggle, 50px rows),
-refused deletion while a conversation is
-running, degraded mode without `unarchiveSession` or without a remote gateway,
-empty-archive and narrow-sidebar rendering, drag/resize geometry math, `Esc`
-handling, plus static assertions over both halves (browser bundle: only `react`
-is required, no `$mount` on hand-written descriptors for the old endpoints, no
-`unlink`; host half: imports only `node:fs/promises` and the Typert protocol,
-unlinks a single file and never a directory tree).
+`node test/client.test.mjs` 是一个零依赖的自测套件：自带手写 mini React 运行时，桩掉 `window.__ModuleLoader__` / `document` / `navigator`，把插件挂到假 `ctx` 上，跑 **220 项断言**——加载契约、槽位注册、中文回退、分组（3 个工作区 → 3 组）、搜索过滤、单条恢复、恢复并打开、批量恢复、定位请求载荷、行内删除确认（行不跳位、确认前不删、描述符带网关要求的严格 codec、mount 复用、删除后重新同步归档快照）、多选恢复/删除、全选、点行条选中（点操作按钮不选中但照常执行）、整组恢复/删除、全部恢复/全部删除在底部而不在 ✕ 旁边、分组折叠（行隐藏、回执计数、其他组不受影响、展开恢复）、点击外部收起、入口宽度偏好（默认紧凑、切换后记住、窄边栏保持方形）、目标尺寸（30px 操作块、34px 分组开关、50px 行高）、运行中被拒、缺少 `unarchiveSession` 或缺网关时的降级、空归档与窄侧边栏渲染、拖拽缩放的几何计算、`Esc`，以及针对两边源码的静态断言（浏览器半边只 require `react`、不 `unlink`；宿主半边只 import `node:fs/promises` 和 Typert 协议、只删单个文件、从不用 `recursive: true`）。最后还会检查文档本身：主 README 是中文、有顿号功能行、截图文件都在仓库里且是有效 PNG、中英两版互相链接。
 
-The plugin's own sources are the only inputs; the harness never touches a DSH
-installation.
+测试只读插件自己的源码，不会碰任何 DSH 安装。
 
-## How delete works (and what it costs)
+---
 
-Deleting is **not** an archive operation — archive only hides a session id.
-`Delete` is destructive and irreversible:
+## 删除的代价
 
-1. **It refuses while the conversation is running.** The host asks the
-   `workspace/session-activity` waterfall first; any active work means the
-   request comes back as `{ deleted: false, reason: "session-active" }` and the
-   panel tells you to stop the run first.
-2. **It removes the transcript file.** The host resolves the log through
-   `sessionPersistence.stat(id)` + `locate(...)` (which handles compressed
-   `.jsonl.zstd` logs) and unlinks exactly that one file. If the file is gone
-   already, the call still succeeds with `existed: false`.
-3. **It cleans up the bookkeeping.** The id is dropped from
-   `archivedSessionIds` (`workspaces.unarchiveSession`), detached from every
-   workspace that lists it, and `api-session/removed` is emitted so open windows
-   drop the row without a restart. DSH's own query index reconciles the missing
-   log on its next scan.
-4. **It cannot be undone.** There is no trash, no undo, and the built-in
-   *Restore* action has nothing left to restore. If you only want a
-   conversation out of the way, use *Archive* instead.
+删除**不是**归档操作——归档只是把会话 ID 藏起来，删除是真的删文件，而且不可撤销：
 
-Bulk delete runs the same single-session call in sequence: one row that is still
-running fails on its own and is reported as `Deleted N, M failed`, while the
-rest of the batch goes through. Nothing is ever deleted recursively — every
-request unlinks one resolved file path, which is why the static test suite also
-asserts the host half never imports `rmSync` and never passes `recursive: true`.
+1. **正在跑就拒绝。** 宿主先问 `workspace/session-activity` 瀑布，有活动就返回 `{ deleted: false, reason: "session-active" }`，面板会提示你先停下。
+2. **删掉会话日志文件。** 通过 `sessionPersistence.stat(id)` + `locate(...)` 定位（压缩过的 `.jsonl.zstd` 也认），只 unlink 这一个文件；文件本来就不在了也算成功（`existed: false`）。
+3. **清理记账。** 从 `archivedSessionIds` 摘掉、从所有列着它的工作区 detach，并发出 `api-session/removed`，让已经打开的窗口不用重启就能把这一行去掉。DSH 自己的查询索引会在下一次扫描时对账。
+4. **没有后悔药。** 没有回收站、没有撤销，内置的「恢复」也恢复不了。只是想让会话别挡路，请用「归档」。
 
-Because the persistence seam deliberately exposes no delete interface, this is
-the one place where the plugin goes beyond DSH's own API surface — hence the
-explicit confirmation step and the "still running" guard.
+批量删除就是把单条调用按顺序跑一遍：某一条还在运行就单条失败，最终报告「成功 N 条、失败 M 条」，其余照常；任何一次请求都只删一个解析出来的文件路径，绝不会递归删目录——所以套件里也专门断言了宿主半边没有 `rmSync`、没有 `recursive: true`。
 
-## Known limitations
+持久化那层故意不提供删除接口，这是插件唯一越过 DSH 公开 API 的地方，所以才有显式确认和「运行中拒绝」这两道闸。
 
-- **Delete is permanent** — no trash, no undo. The action is gated behind an
-  inline confirmation and refuses sessions with running work, but once it
-  succeeds the transcript is gone.
-- **Reveal targets the working directory**, not the transcript directory: DSH
-  0.2 no longer exposes a session-log path to client plugins, so the old
-  "open conversation folder" action was re-pointed at `session.cwd`.
-- **The projection cache is left behind.** Deleting unlinks the session log; the
-  small entry under `storages/session_projcache/` is DSH's own cache and is
-  reconciled by the host on the next scan, so the plugin does not touch it.
-- The panel refreshes optimistically on restore and delete; the authoritative
-  `archivedSessionIds` set re-syncs with the next workspace baseline
-  (reconnect / list refresh).
-- Restoring or deleting a session whose agent is still running is refused by the
-  host; the panel surfaces that as an error toast.
+---
 
-## License
+## 已知限制
+
+- **删除是永久的**——没有回收站、不能撤销。行为有行内确认和运行中保护，但一旦成功，日志就没了。
+- **「显示工作目录」定位的是 `cwd`**，不是日志目录：DSH 0.2 不再把会话日志路径暴露给客户端插件，所以老版本的「打开会话文件夹」被改成了定位工作目录。
+- **投影缓存会留下。** 删除只 unlink 会话日志，`storages/session_projcache/` 下的小缓存是 DSH 自己的，下一次扫描会自行对账，插件不去动它。
+- 恢复和删除后面板是乐观刷新；权威的 `archivedSessionIds` 会在下一次工作区基线（重连 / 刷新列表）时对齐。
+- 会话的 agent 还在运行时，恢复和删除都会被宿主拒绝，面板用错误提示告诉你。
+
+---
+
+## 关于我
+
+我是 Earnest，日常在 DeepSeek Harness 里写文档、改插件、记零碎想法，归档一多就受不了那种「东西还在、但找不到」的感觉。这个插件的每个细节基本都是我用着别扭之后改出来的：确认条从底部搬到了行内、全部恢复从 ✕ 旁边挪到了底部、勾选从只认小方框变成了整行可点。
+
+如果你也在用，或者发现哪里还别扭，欢迎开 issue：<https://github.com/Earnest02522/dsh-archive-manager/issues>。
+
+> **关于截图里的数据**：文中所有截图都来自一次性测试 profile，里面两个工作区（`dsh-archive-manager`、`product-notes`）和 7 条会话标题全是手写的示例内容，没有任何真实会话标题、真实路径或账号信息；截图完成后测试 profile 即被丢弃。
+
+---
+
+## 许可证
 
 MIT
